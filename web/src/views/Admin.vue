@@ -41,6 +41,12 @@
         <li :class="{active: page==='card'}" @click="page='card'; closeSider()">卡片管理</li>
         <li :class="{active: page==='ad'}" @click="page='ad'; closeSider()">广告管理</li>
         <li :class="{active: page==='friend'}" @click="page='friend'; closeSider()">友链管理</li>
+        
+        <li class="menu-divider"></li>
+        <li :class="{active: page==='settings'}" @click="page='settings'; closeSider()">网站外观设置</li>
+        <li :class="{active: page==='backup'}" @click="page='backup'; closeSider()">数据备份与恢复</li>
+        <li class="menu-divider"></li>
+
         <li :class="{active: page==='user'}" @click="page='user'; closeSider()">用户管理</li>
       </ul>
     </aside>
@@ -82,6 +88,9 @@
         <AdManage v-if="page==='ad'" />
         <FriendLinkManage v-if="page==='friend'" />
         <UserManage v-if="page==='user'" />
+        <BackupManage v-if="page==='backup'" />
+        <SiteSettings v-if="page==='settings'" />
+        
       </div>
       <footer class="admin-footer">
         <p class="admin-copyright">Copyright © 2025 Nav-Item | <a href="https://github.com/eooce/Nav-Item" target="_blank" class="footer-link">Powered by eooce</a></p>
@@ -98,6 +107,8 @@ import CardManage from './admin/CardManage.vue';
 import AdManage from './admin/AdManage.vue';
 import FriendLinkManage from './admin/FriendLinkManage.vue';
 import UserManage from './admin/UserManage.vue';
+import BackupManage from './admin/BackupManage.vue'; 
+import SiteSettings from './admin/SiteSettings.vue'; // 1. 导入新组件
 
 const page = ref('welcome');
 const lastLoginTime = ref('');
@@ -117,6 +128,8 @@ const pageTitle = computed(() => {
     case 'ad': return '广告管理';
     case 'friend': return '友链管理';
     case 'user': return '用户管理';
+    case 'backup': return '数据备份与恢复';
+    case 'settings': return '网站外观设置'; // 2. 添加新标题
     default: return '';
   }
 });
@@ -125,7 +138,6 @@ onMounted(() => {
   const token = localStorage.getItem('token');
   isLoggedIn.value = !!token;
   if (isLoggedIn.value) {
-    // 拉取用户信息
     fetchLastLoginInfo();
   }
 });
@@ -186,6 +198,12 @@ function closeSider() {
 </script>
 
 <style scoped>
+.menu-divider {
+  height: 1px;
+  background: #e3e6ef;
+  margin: 8px 16px;
+}
+/* (…… 其他所有样式保持不变 ……) */
 .login-container {
   display: flex;
   justify-content: center;
@@ -194,7 +212,6 @@ function closeSider() {
   background: linear-gradient(135deg,#667eea,#764ba2);
   font-family: 'Segoe UI', Arial, sans-serif;
 }
-
 .login-card {
   background: #fff;
   border-radius: 12px;
@@ -203,7 +220,6 @@ function closeSider() {
   width: 400px;
   max-width: 90%;
 }
-
 .login-title {
   text-align: center;
   font-size: 2rem;
@@ -212,13 +228,11 @@ function closeSider() {
   margin-bottom: 32px;
   letter-spacing: 2px;
 }
-
 .login-form {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-
 .login-input {
   padding: 12px 16px;
   border: 1px solid #d0d7e2;
@@ -230,12 +244,10 @@ function closeSider() {
   line-height: 48px;
   box-sizing: border-box;
 }
-
 .login-input:focus {
   outline: 2px solid #2566d8;
   border-color: #2566d8;
 }
-
 .login-btn {
   background: #2566d8;
   color: #fff;
@@ -247,22 +259,18 @@ function closeSider() {
   cursor: pointer;
   transition: background 0.2s;
 }
-
 .login-btn:hover:not(:disabled) {
   background: #174ea6;
 }
-
 .login-btn:disabled {
   background: #ccc;
   cursor: not-allowed;
 }
-
 .login-buttons {
   display: flex;
   gap: 12px;
   align-items: center;
 }
-
 .back-btn {
   background: #f8f9fa;
   color: #2b2b2b;
@@ -279,24 +287,20 @@ function closeSider() {
   flex: 1;
   justify-content: center;
 }
-
 .back-btn:hover {
   background: #e9ecef;
   color: #7e42ff;
   border-color: #adb5bd;
 }
-
 .login-btn {
   flex: 2;
 }
-
 .login-error {
   color: #e74c3c;
   text-align: center;
   margin: 0;
   font-size: 14px;
 }
-
 .admin-layout {
   display: flex;
   min-height: 100vh;
@@ -607,7 +611,6 @@ function closeSider() {
     color: #2566d8;
     z-index: 300;
   }
-  /* 表单和按钮间距优化 */
   .input, .btn {
     margin-bottom: 8px;
   }
@@ -615,4 +618,4 @@ function closeSider() {
 .menu-toggle {
   display: none;
 }
-</style> 
+</style>

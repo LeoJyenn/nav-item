@@ -29,6 +29,10 @@ export const addCard = (data) => axios.post(`${BASE}/cards`, data, { headers: au
 export const updateCard = (id, data) => axios.put(`${BASE}/cards/${id}`, data, { headers: authHeaders() });
 export const deleteCard = (id) => axios.delete(`${BASE}/cards/${id}`, { headers: authHeaders() });
 
+export const globalSearchCards = (query) => {
+  return axios.get(`${BASE}/cards/search`, { params: { q: query } });
+};
+
 export const uploadLogo = (file) => {
   const formData = new FormData();
   formData.append('logo', file);
@@ -50,4 +54,30 @@ export const deleteFriend = (id) => axios.delete(`${BASE}/friends/${id}`, { head
 // 用户API
 export const getUserProfile = () => axios.get(`${BASE}/users/profile`, { headers: authHeaders() });
 export const changePassword = (oldPassword, newPassword) => axios.put(`${BASE}/users/password`, { oldPassword, newPassword }, { headers: authHeaders() });
-export const getUsers = () => axios.get(`${BASE}/users`, { headers: authHeaders() }); 
+export const getUsers = () => axios.get(`${BASE}/users`, { headers: authHeaders() });
+
+// 备份与恢复 API
+export const exportBackup = () => {
+  return axios.get(`${BASE}/backup/export`, {
+    headers: authHeaders(),
+    responseType: 'blob', 
+  });
+};
+export const importBackup = (formData) => {
+  return axios.post(`${BASE}/backup/import`, formData, {
+    headers: {
+      ...authHeaders(),
+      'Content-Type': 'multipart/form-data', 
+    },
+  });
+};
+
+// 网站设置 API
+export const getSettings = () => {
+  return axios.get(`${BASE}/settings`); // (公开)
+};
+export const updateSettings = (settingsData) => {
+  return axios.post(`${BASE}/settings`, settingsData, { // (私有)
+    headers: authHeaders(),
+  });
+};

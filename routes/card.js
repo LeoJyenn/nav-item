@@ -3,17 +3,49 @@ const db = require('../db');
 const auth = require('./authMiddleware');
 const router = express.Router();
 
+// --- START: 新增一个路由用于全局搜索 ---
+// GET /api/cards/search?q=...
+router.get('/search', (req, res) => {
+  const query = req.query.q;
+
+  if (!query) {
+    return res.status(400).json({ error: '搜索词不能为空' });
+  }
+
+  const searchTerm = `%${query}%`;
+  
+  // 仅在卡片中搜索
+  const sql = `
+    SELECT * FROM cards 
+    WHERE title LIKE ? OR desc LIKE ? OR url LIKE ?
+    ORDER BY "order"
+  `;
+  
+  db.all(sql, [searchTerm, searchTerm, searchTerm], (err, rows) => {
+    if (err) return res.status(500).json({error: err.message});
+    
+    rows.forEach(card => {
+      if (!card.custom_logo_path) {
+        card.display_logo = card.logo_url || (card.url.replace(/\/+$/, '') + '/favicon.ico');
+      } else {
+        card.display_logo = '/uploads/' + card.custom_logo_path;
+      }
+    });
+    res.json(rows);
+  });
+});
+// --- END: 新增路由 ---
+
+
 // 获取指定菜单的卡片
 router.get('/:menuId', (req, res) => {
   const { subMenuId } = req.query;
   let query, params;
   
   if (subMenuId) {
-    // 获取指定子菜单的卡片
     query = 'SELECT * FROM cards WHERE sub_menu_id = ? ORDER BY "order"';
     params = [subMenuId];
   } else {
-    // 获取主菜单的卡片（不包含子菜单的卡片）
     query = 'SELECT * FROM cards WHERE menu_id = ? AND sub_menu_id IS NULL ORDER BY "order"';
     params = [req.params.menuId];
   }
@@ -57,4 +89,4 @@ router.delete('/:id', auth, (req, res) => {
   });
 });
 
-module.exports = router; 
+module.exports = router;

@@ -9,6 +9,8 @@ const authRoutes = require('./routes/auth');
 const adRoutes = require('./routes/ad');
 const friendRoutes = require('./routes/friend');
 const userRoutes = require('./routes/user');
+const backupRoutes = require('./routes/backup'); 
+const settingsRoutes = require('./routes/settings'); 
 const compression = require('compression');
 const app = express();
 
@@ -38,9 +40,11 @@ app.use('/api/cards', cardRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api', authRoutes);
 app.use('/api/ads', adRoutes);
-app.use('/api/friends', friendRoutes);
+app.use('/api/friends', friendRoutes); 
 app.use('/api/users', userRoutes);
+app.use('/api/backup', backupRoutes);
+app.use('/api/settings', settingsRoutes);
 
 app.listen(PORT, () => {
   console.log(`server is running at http://localhost:${PORT}`);
-}); 
+});
