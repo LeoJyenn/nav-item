@@ -48,6 +48,22 @@
       </div>
 
       <div class="form-group">
+        <label for="glass_opacity">
+          毛玻璃透明度: {{ Number(settings.glass_opacity).toFixed(2) }}
+        </label>
+        <input 
+          id="glass_opacity"
+          type="range"
+          v-model.number="settings.glass_opacity" 
+          min="0.0"
+          max="1.0"
+          step="0.01"
+          class="slider"
+        />
+        <p class="input-hint">值越小，毛玻璃越透明。推荐 0.6 ~ 0.8。 (控制菜单栏、卡片、搜索框)</p>
+      </div>
+
+      <div class="form-group">
         <label for="custom_css">自定义 CSS</label>
         <textarea 
           id="custom_css"
@@ -80,6 +96,7 @@ const settings = ref({
   bg_url_pc: '',
   bg_url_mobile: '',
   bg_opacity: 0.15,
+  glass_opacity: 0.7, 
   custom_css: '/* 自定义样式 */'
 });
 const isLoading = ref(false);
@@ -94,7 +111,17 @@ onMounted(async () => {
         ...settings.value, 
         ...response.data   
     };
-    settings.value.bg_opacity = parseFloat(settings.value.bg_opacity); 
+    
+    // ---
+    // 修复点 1：0.00 Bug (严格检查)
+    // ---
+    const rawBgOpacity = parseFloat(settings.value.bg_opacity);
+    settings.value.bg_opacity = isNaN(rawBgOpacity) ? 0.15 : rawBgOpacity;
+
+    const rawGlassOpacity = parseFloat(settings.value.glass_opacity);
+    settings.value.glass_opacity = isNaN(rawGlassOpacity) ? 0.7 : rawGlassOpacity;
+    // --- 修复结束 ---
+
   } catch (error) {
     message.value = '加载设置失败: ' + error.message;
     messageType.value = 'error';
@@ -109,13 +136,15 @@ async function saveSettings() {
   try {
     const dataToSave = {
         ...settings.value,
-        bg_opacity: String(settings.value.bg_opacity)
+        bg_opacity: String(settings.value.bg_opacity),
+        glass_opacity: String(settings.value.glass_opacity)
     };
     await updateSettings(dataToSave);
     message.value = '设置已成功保存！';
     messageType.value = 'success';
     setTimeout(() => { message.value = ''; }, 3000); // 自动消失
-  } catch (error) {
+  } catch (error)
+{
     message.value = '保存失败: ' + (error.response?.data?.error || error.message);
     messageType.value = 'error';
     setTimeout(() => { message.value = ''; }, 5000); // 自动消失
@@ -143,7 +172,8 @@ async function saveSettings() {
 .card-title {
   font-size: 1.75rem;
   font-weight: 600;
-  color: #333;
+  /* --- 修复点 4：字体黑色 --- */
+  color: #000;
   margin-top: 0;
   margin-bottom: 16px;
   display: flex;
@@ -152,7 +182,8 @@ async function saveSettings() {
 }
 .card-desc {
   font-size: 1rem;
-  color: #555;
+  /* --- 修复点 4：字体黑色 --- */
+  color: #000;
   line-height: 1.6;
   margin-bottom: 24px;
 }
@@ -163,7 +194,8 @@ async function saveSettings() {
   display: block;
   font-size: 1rem;
   font-weight: 500;
-  color: #333;
+  /* --- 修复点 4：字体黑色 --- */
+  color: #000;
   margin-bottom: 8px;
 }
 .input {
@@ -172,7 +204,8 @@ async function saveSettings() {
   border-radius: 8px;
   border: 1px solid #d0d7e2;
   background: #fff;
-  color: #222;
+  /* --- 修复点 4：字体黑色 --- */
+  color: #000;
   font-size: 0.9rem;
   transition: all 0.2s ease;
   box-sizing: border-box; 

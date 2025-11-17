@@ -1,8 +1,9 @@
 <template>
-  <div class="home-container" :style="backgroundStyles">
+  <div class="home-container" :style="backgroundStyles" @click="onBlankAreaClick">
   
     <div class="menu-bar-fixed">
       <MenuBar 
+        :ref="menuBarRef"
         :menus="menus" 
         :activeId="activeMenu?.id" 
         :activeSubMenuId="activeSubMenu?.id"
@@ -57,7 +58,7 @@
       </a>
     </div>
     
-    <CardGrid :cards="cards"/>
+    <CardGrid :cards="cards" @click.stop /> 
     
     <footer class="footer">
       <div class="footer-content">
@@ -68,7 +69,7 @@
           </svg>
           友情链接
         </button>
-        <p class="copyright">Copyright © 2025 Nav-Item | <a href="https://github.com/eooce/Nav-Item" target="_blank" class="footer-link">Powered by eooce</a></p>
+        <p class="copyright">Copyright © 2025 Nav-Item | <a href="https://github.com/LeoJyenn/nav-item" target="_blank" class="footer-link">Powered by LeoJyenn</a></p>
       </div>
     </footer>
 
@@ -131,48 +132,50 @@ const friendLinks = ref([]);
 const isGlobalSearchActive = ref(false);
 let debounceTimer = null;
 
+const menuBarRef = ref(null);
+
+const cardsCache = new Map();
+
 const settings = ref({
   bg_url_pc: '',
   bg_url_mobile: '',
-  bg_opacity: '0.15',
+  bg_opacity: '1',
+  glass_opacity: '1', 
   custom_css: '' 
 });
-
-const DEFAULT_BG = "url('https://main.ssss.nyc.mn/background.webp')";
-const DEFAULT_OVERLAY = 'rgba(0, 0, 0, 0.3)';
 
 const backgroundStyles = computed(() => {
   const pcUrl = settings.value.bg_url_pc;
   const mobileUrl = settings.value.bg_url_mobile;
-  const opacity = parseFloat(settings.value.bg_opacity);
+  
+  const rawBgOp = parseFloat(settings.value.bg_opacity);
+  const opacity = isNaN(rawBgOp) ? 0.15 : rawBgOp; 
   const overlayTint = 1.0 - opacity; 
-  const dynamicOverlayColor = `rgba(0, 0, 0, ${overlayTint})`;
   
-  const styles = {
-      '--dynamic-overlay-color': dynamicOverlayColor
-  };
+  const styles = {}; 
 
-  if (!pcUrl && !mobileUrl) {
-    return styles;
-  }
-  
-  if (pcUrl && !mobileUrl) {
+  if (pcUrl) {
     styles['--dynamic-bg-pc'] = `url(${pcUrl})`;
-    styles['--dynamic-bg-mobile'] = DEFAULT_BG; 
-    return styles;
   }
-  
-  if (!pcUrl && mobileUrl) {
-    styles['--dynamic-bg-pc'] = DEFAULT_BG;
+  if (mobileUrl) {
     styles['--dynamic-bg-mobile'] = `url(${mobileUrl})`;
-    return styles;
   }
 
-  if (pcUrl && mobileUrl) {
-    styles['--dynamic-bg-pc'] = `url(${pcUrl})`;
-    styles['--dynamic-bg-mobile'] = `url(${mobileUrl})`;
-    return styles;
+  if (pcUrl || mobileUrl) {
+    styles['--dynamic-overlay-color'] = `rgba(0, 0, 0, ${overlayTint})`;
+  } else {
+    styles['--dynamic-overlay-color'] = 'rgba(0, 0, 0, 0)';
   }
+
+  const rawGlass = settings.value.glass_opacity;
+  const rawGlassOp = parseFloat(rawGlass);
+  const glassOpacity = isNaN(rawGlassOp) ? 0.7 : rawGlassOp;
+  
+  styles['--glass-color-rgb'] = '255, 255, 255'; 
+  styles['--glass-opacity'] = glassOpacity;
+  
+  const hoverOpacity = Math.min(glassOpacity + 0.15, 1.0);
+  styles['--glass-opacity-hover'] = hoverOpacity;
   
   return styles;
 });
@@ -284,8 +287,24 @@ async function selectMenu(menu, parentMenu = null) {
 
 async function loadCards() {
   if (!activeMenu.value) return;
-  const res = await getCards(activeMenu.value.id, activeSubMenu.value?.id);
-  cards.value = res.data;
+
+  const cacheKey = activeSubMenu.value 
+    ? `submenu-${activeSubMenu.value.id}` 
+    : `menu-${activeMenu.value.id}`;
+
+  if (cardsCache.has(cacheKey)) {
+    cards.value = cardsCache.get(cacheKey);
+    return; 
+  }
+
+  try {
+    const res = await getCards(activeMenu.value.id, activeSubMenu.value?.id);
+    cards.value = res.data;
+    cardsCache.set(cacheKey, res.data);
+  } catch (error) {
+    console.error("加载卡片失败:", error);
+    cards.value = []; 
+  }
 }
 
 function onSearchInput() {
@@ -306,14 +325,27 @@ async function handleSearch(isRealtime = false) {
   clearTimeout(debounceTimer);
 
   if (selectedEngine.value.name === 'site') {
-    if (!searchQuery.value.trim()) {
+    const query = searchQuery.value.trim();
+    if (!query) {
       clearSearch();
       return;
     }
-    
+
+    const cacheKey = `search-${query}`;
+
+    if (cardsCache.has(cacheKey)) {
+      cards.value = cardsCache.get(cacheKey);
+      isGlobalSearchActive.value = true;
+      activeMenu.value = null; 
+      activeSubMenu.value = null;
+      return; 
+    }
+
     try {
-      const res = await globalSearchCards(searchQuery.value.trim());
+      const res = await globalSearchCards(query);
       cards.value = res.data;
+      cardsCache.set(cacheKey, res.data);
+      
       isGlobalSearchActive.value = true;
       activeMenu.value = null; 
       activeSubMenu.value = null;
@@ -330,6 +362,12 @@ async function handleSearch(isRealtime = false) {
   }
 }
 
+function onBlankAreaClick() {
+  if (menuBarRef.value) {
+    menuBarRef.value.closeAllSubMenus();
+  }
+}
+
 function handleLogoError(event) {
   event.target.style.display = 'none';
   event.target.nextElementSibling.style.display = 'flex';
@@ -338,41 +376,121 @@ function handleLogoError(event) {
 
 <style scoped>
 .home-container {
-  background-image: url('https://main.ssss.nyc.mn/background.webp');
-  background-image: var(--dynamic-bg-pc, url('https://main.ssss.nyc.mn/background.webp'));
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
+  background-color: transparent;
   min-height: 95vh;
   display: flex;
   flex-direction: column;
   position: relative;
   padding-top: 50px; 
+  isolation: isolate; 
 }
-@media (max-width: 768px) {
-  .home-container {
-    background-image: var(--dynamic-bg-mobile, var(--dynamic-bg-pc, url('https://main.ssss.nyc.mn/background.webp')));
-  }
-}
+
 .home-container::before {
   content: '';
-  position: absolute;
+  position: fixed; 
   top: 0;
   left: 0;
   right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.3);
-  background: var(--dynamic-overlay-color, rgba(0, 0, 0, 0.3));
-  z-index: 1;
+  height: 100lvh;
+  background-image: var(--dynamic-bg-pc); 
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: -2; 
 }
+
+.home-container::after {
+  content: '';
+  position: fixed; 
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100lvh;
+  background: var(--dynamic-overlay-color, rgba(0, 0, 0, 0));
+  z-index: -1; 
+}
+
+@media (max-width: 768px) {
+  .home-container::before {
+    background-image: var(--dynamic-bg-mobile);
+  }
+
+  .home-container {
+    padding-top: 80px;
+  }
+  .content-wrapper {
+    gap: 0.5rem;
+  }
+  .ad-space {
+    height: 60px;
+  }
+  .ad-placeholder {
+    height: 50px;
+    font-size: 12px;
+    padding: 1rem 0.5rem;
+  }
+  .footer {
+    padding-top: 2rem;
+  }
+  
+  .footer-content {
+    /* 修改这里：保持水平布局，与PC端一致 */
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px;
+    padding: 0 10px;
+  }
+  
+  .friend-link-btn {
+    font-size: 0.7rem;
+  }
+  .copyright {
+    font-size: 0.7rem;
+    margin: 0; /* 确保没有额外的外边距 */
+  }
+
+  .friend-links-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .container {
+    width: 95%;
+  }
+}
+
+
 .menu-bar-fixed {
   position: fixed;
-  top: .6rem;
+  top: 0;
+  padding-top: env(safe-area-inset-top);
   left: 0;
   width: 100vw;
   z-index: 100;
+  backdrop-filter: blur(10px);
+  background-color: rgba(var(--glass-color-rgb), var(--glass-opacity));
+  box-shadow: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  transition: background-color 0.3s ease;
 }
+.search-container {
+  display: flex;
+  align-items: center;
+  background: rgba(var(--glass-color-rgb), var(--glass-opacity));
+  border-radius: 20px;
+  padding: 0.3rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(10px);
+  max-width: 480px;
+  width: 92%;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: background-color 0.3s ease;
+}
+
+.search-container:hover {
+  background: rgba(var(--glass-color-rgb), var(--glass-opacity-hover));
+}
+
 .search-engine-select {
   display: flex;
   flex-direction: row;
@@ -385,7 +503,7 @@ function handleLogoError(event) {
 .engine-btn {
   border: none;
   background: none;
-  color: #ffffff;
+  color: #000;
   font-size: .8rem ;
   padding: 2px 10px;
   border-radius: 4px;
@@ -398,23 +516,11 @@ function handleLogoError(event) {
 }
 .engine-btn.active, .engine-btn:hover {
   color: #399dff;
-  background: #ffffff1a;
+  background: #eeeeee;
 }
 .admin-btn {
 }
 .admin-btn:hover {
-}
-.search-container {
-  display: flex;
-  align-items: center;
-  background: #b3b7b83b;
-  border-radius: 20px;
-  padding: 0.3rem;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(10px);
-  max-width: 480px;
-  width: 92%;
-  position: relative;
 }
 .search-input {
   flex: 1;
@@ -422,11 +528,11 @@ function handleLogoError(event) {
   background: transparent;
   padding: .1rem .5rem;
   font-size: 1.2rem;
-  color: #ffffff;
+  color: #000;
   outline: none;
 }
 .search-input::placeholder {
-  color: #999;
+  color: #888;
 }
 .clear-btn {
   background: none;
@@ -438,9 +544,12 @@ function handleLogoError(event) {
   align-items: center;
   padding: 0;
 }
+.clear-btn svg {
+  stroke: #000;
+}
 .search-btn {
   background: #e9e9eb00;
-  color: #ffffff;
+  color: #000;
   border: none;
   border-radius: 50%;
   width: 40px;
@@ -454,6 +563,7 @@ function handleLogoError(event) {
 }
 .search-btn:hover {
   background: #3367d6;
+  color: #ffffff;
 }
 .search-section {
   display: flex;
@@ -511,11 +621,10 @@ function handleLogoError(event) {
   margin: 0 auto;
 }
 .ad-placeholder {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border: 2px dashed rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.05);
+  border: 2px dashed rgba(0, 0, 0, 0.2);
   border-radius: 12px;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(0, 0, 0, 0.4);
   padding: 2rem 1rem;
   text-align: center;
   font-size: 14px;
@@ -545,7 +654,7 @@ function handleLogoError(event) {
   gap: 8px;
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.8);
+  color: #000;
   cursor: pointer;
   transition: all 0.3s ease;
   font-size: 14px;
@@ -553,7 +662,6 @@ function handleLogoError(event) {
 }
 .friend-link-btn:hover {
   color: #1976d2;
-  transform: translateY(-1px);
 }
 .modal-overlay {
   position: fixed;
@@ -569,7 +677,7 @@ function handleLogoError(event) {
   backdrop-filter: blur(5px);
 }
 .modal-content {
-  background: #8585859c;
+  background: #ffffff;
   border-radius: 16px;
   width: 55rem;
   height: 30rem;
@@ -586,13 +694,13 @@ function handleLogoError(event) {
   justify-content: space-between;
   padding: 10px 20px;
   border-bottom: 1px solid #e5e7eb;
-  background: #d3d6d8;
+  background: #f9f9ff;
 }
 .modal-header h3 {
   margin: 0;
   font-size: 24px;
   font-weight: 600;
-  color: #111827;
+  color: #000;
 }
 .close-btn {
   background: none;
@@ -617,31 +725,22 @@ function handleLogoError(event) {
   grid-template-columns: repeat(6, 1fr);
   gap: 12px;
 }
-@media (max-width: 768px) {
-  .friend-links-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  .container {
-    width: 95%;
-  }
-}
 .friend-link-card {
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 6px;
-  background: #cfd3d661;
+  background: #f5f5f5;
   border-radius: 15px;
   text-decoration: none;
   color: inherit;
   transition: all 0.2s ease;
-  border: 1px solid #cfd3d661;
+  border: 1px solid #eee;
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 .friend-link-card:hover {
-  transform: translateY(-2px);
   box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-  background: #ffffff8e;
+  background: #e9e9e9;
 }
 .friend-link-logo {
   width: 48px;
@@ -676,19 +775,19 @@ function handleLogoError(event) {
   margin: 0;
   font-size: 13px;
   font-weight: 500;
-  color: #374151;
+  color: #000;
   text-align: center;
   line-height: 1.3;
   word-break: break-all;
 }
 .copyright {
-  color: rgba(255, 255, 255, 0.8);
+  color: #000;
   font-size: 14px;
   margin: 0;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  text-shadow: none;
 }
 .footer-link {
-  color: #ffffffcc;
+  color: #000;
   text-decoration: none;
   transition: color 0.2s;
 }
@@ -746,49 +845,6 @@ function handleLogoError(event) {
   }
   .ad-placeholder {
     height: 80px;
-  }
-}
-@media (max-width: 768px) {
-  .home-container {
-    padding-top: 80px;
-  }
-  .content-wrapper {
-    gap: 0.5rem;
-  }
-  .ad-space {
-    height: 60px;
-  }
-  .ad-placeholder {
-    height: 50px;
-    font-size: 12px;
-    padding: 1rem 0.5rem;
-  }
-  .footer {
-    padding-top: 2rem;
-  }
-  .friend-link-btn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: none;
-    border: none;
-    color: rgba(255, 255, 255, 0.8);
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-size: 0.7rem;
-    padding: 0;
-  }
-  .copyright {
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 0.7rem;
-    margin: 0;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-  }
-  .footer-content {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 20px;
   }
 }
 </style>
