@@ -37,47 +37,53 @@
 ```
 nav-item/
 ├── app.js                 # 后端主入口文件
-├── config.js             # 配置文件
-├── db.js                 # 数据库初始化
-├── package.json          # 后端依赖配置
-├── database/             # 数据库文件目录
-│   └── nav.db           # SQLite数据库文件
-├── routes/               # 后端路由
-│   ├── auth.js          # 认证相关路由
-│   ├── menu.js          # 菜单管理路由
-│   ├── card.js          # 卡片管理路由
-│   ├── ad.js            # 广告管理路由
-│   ├── friend.js        # 友链管理路由
-│   ├── user.js          # 用户管理路由
-│   └── upload.js        # 文件上传路由
-├── uploads/              # 上传文件目录
+├── config.js              # 配置文件
+├── db.js                  # 数据库初始化
+├── package.json           # 后端依赖配置
+├── database/              # 数据库文件目录
+│   └── nav.db             # SQLite 数据库文件
+├── routes/                # 后端路由
+│   ├── auth.js            # 认证相关路由
+│   ├── authMiddleware.js  # 鉴权中间件（如果你是单独拆出来的话）
+│   ├── menu.js            # 菜单管理路由
+│   ├── card.js            # 卡片管理路由
+│   ├── ad.js              # 广告管理路由
+│   ├── friend.js          # 友链管理路由
+│   ├── user.js            # 用户管理路由
+│   ├── upload.js          # 文件上传路由
+│   ├── backup.js          # ✅ 数据备份与恢复路由
+│   └── settings.js        # ✅ 网站外观 / 全局设置路由
+├── uploads/               # 上传文件目录
 │   └── default-favicon.png
-├── web/                  # 前端项目目录
-│    ├── package.json      # 前端依赖配置
-│    ├── vite.config.mjs   # Vite配置文件
-│    ├── index.html        # HTML入口文件
-│    ├── public/           # 静态资源
-│    │   ├── background.webp
-│    │   ├── default-favicon.png
-│    │   └── robots.txt
-│    └── src/              # 前端源码
-│        ├── main.js       # Vue应用入口
-│        ├── router.js     # 路由配置
-│        ├── api.js        # API接口封装
-│        ├── App.vue       # 根组件
-│        ├── components/   # 公共组件
-│        │   ├── MenuBar.vue
-│        │   └── CardGrid.vue
-│        └── views/        # 页面组件
-│            ├── Home.vue  # 首页
-│            ├── Admin.vue # 后台管理
-│            └── admin/    # 后台管理子页面
-│                ├── MenuManage.vue
-│                ├── CardManage.vue
-│               ├── AdManage.vue
-│               ├── FriendLinkManage.vue
-│               └── UserManage.vue
-├── Dockerfile # Docker构建文件
+├── web/                   # 前端项目目录 (Vite + Vue3)
+│   ├── package.json       # 前端依赖配置
+│   ├── vite.config.mjs    # Vite 配置文件
+│   ├── index.html         # HTML 入口文件
+│   ├── public/            # 静态资源
+│   │   ├── background.webp
+│   │   ├── default-favicon.png
+│   │   └── robots.txt
+│   └── src/               # 前端源码
+│       ├── main.js        # Vue 应用入口
+│       ├── router.js      # 路由配置
+│       ├── api.js         # API 接口封装（含 getSettings / saveSettings / backup 等）
+│       ├── App.vue        # 根组件
+│       ├── components/    # 公共组件
+│       │   ├── MenuBar.vue
+│       │   └── CardGrid.vue
+│       └── views/         # 页面组件
+│           ├── Home.vue       # 首页（读取 settings，控制背景 / 字体颜色模式等）
+│           ├── Admin.vue      # 后台管理（登录 + 布局 + 侧边栏）
+│           └── admin/         # 后台管理子页面
+│               ├── MenuManage.vue        # 栏目管理
+│               ├── CardManage.vue        # 卡片管理
+│               ├── AdManage.vue          # 广告管理
+│               ├── FriendLinkManage.vue  # 友链管理
+│               ├── UserManage.vue        # 用户管理
+│               ├── BackupManage.vue      # ✅ 数据备份与恢复（调用 /api/backup）
+│               └── SiteSettings.vue      # ✅ 网站外观设置（调用 /api/settings）
+├── Dockerfile             # Docker 构建文件
+
 ```
 
 ## ⚙️ 环境变量及配置说明

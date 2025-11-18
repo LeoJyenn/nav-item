@@ -1,0 +1,1 @@
+html{margin:0;padding:0;background-color:#fff;height:100%;width:100%}body{margin:0;padding:0;min-height:100%;background-color:#fff;overflow-x:hidden;-webkit-overflow-scrolling:touch}#app{background-color:#fff;min-height:100vh;min-height:-webkit-fill-available}@supports (height: 100dvh){#app{min-height:100dvh}}
