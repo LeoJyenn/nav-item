@@ -157,13 +157,26 @@ function applyCustomCode(code) {
   if (typeof window === 'undefined') return;
 
   const containerId = 'nav-custom-code-container';
-  let old = document.getElementById(containerId);
-  if (old) {
-    old.remove();
-  }
+  const inlineScriptId = 'nav-custom-inline-script';
+
+  const oldContainer = document.getElementById(containerId);
+  if (oldContainer) oldContainer.remove();
+
+  const oldInlineScript = document.getElementById(inlineScriptId);
+  if (oldInlineScript) oldInlineScript.remove();
 
   if (!code || !code.trim()) return;
 
+  // 纯 JS（没有任何标签）时，直接当脚本执行
+  if (!code.includes('<')) {
+    const script = document.createElement('script');
+    script.id = inlineScriptId;
+    script.textContent = code;
+    document.body.appendChild(script);
+    return;
+  }
+
+  // 含 HTML / style / script 的情况
   const wrapper = document.createElement('div');
   wrapper.id = containerId;
   wrapper.innerHTML = code;
@@ -325,7 +338,15 @@ onMounted(async () => {
   window.addEventListener('resize', handleResize);
 
   getSettings().then(res => {
-    settings.value = { ...settings.value, ...res.data };
+    const data = res.data || {};
+    settings.value = {
+      ...settings.value,
+      ...data
+    };
+    // 兼容老版本：如果没有 custom_code，但有 custom_css，就用 custom_css
+    if (!settings.value.custom_code && data.custom_css) {
+      settings.value.custom_code = data.custom_css || '';
+    }
   }).catch(err => {
     console.error("加载网站设置失败:", err);
   });
