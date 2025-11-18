@@ -1,88 +1,81 @@
 <template>
-  <div class="settings-manage">
+  <div class="site-settings">
     <div class="settings-card">
-      <h2 class="card-title">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2566d8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m-8-4V7l8-4m0 14l8-4"/></svg>
-        网站外观设置
-      </h2>
-      <p class="card-desc">
-        在这里设置您网站的背景图、透明度和自定义CSS。
-      </p>
-
-      <div class="form-group">
-        <label for="bg_pc">电脑端 (PC) 背景图 URL</label>
-        <input 
-          id="bg_pc"
-          v-model="settings.bg_url_pc" 
-          placeholder="https://example.com/pc_background.jpg" 
+      <div class="form-row">
+        <label class="form-label">PC 端背景图片地址</label>
+        <input
+          v-model="form.bg_url_pc"
+          type="text"
           class="input"
+          placeholder="例如：https://example.com/bg-pc.jpg"
         />
-        <p class="input-hint">推荐横屏图片 (例如 1920x1080)。</p>
       </div>
 
-      <div class="form-group">
-        <label for="bg_mobile">移动端背景图 URL</label>
-        <input 
-          id="bg_mobile"
-          v-model="settings.bg_url_mobile" 
-          placeholder="https://example.com/mobile_background.jpg" 
+      <div class="form-row">
+        <label class="form-label">移动端背景图片地址</label>
+        <input
+          v-model="form.bg_url_mobile"
+          type="text"
           class="input"
+          placeholder="例如：https://example.com/bg-mobile.jpg"
         />
-        <p class="input-hint">推荐竖屏图片 (例如 1080x1920)。如果留空，手机将使用默认背景图。</p>
       </div>
 
-      <div class="form-group">
-        <label for="bg_opacity">
-          背景蒙版透明度: {{ Number(settings.bg_opacity).toFixed(2) }}
-        </label>
-        <input 
-          id="bg_opacity"
-          type="range"
-          v-model.number="settings.bg_opacity" 
-          min="0.0"
-          max="1.0"
-          step="0.01"
-          class="slider"
-        />
-        <p class="input-hint">值越大，背景图片越清晰，内容可能越难看清。</p>
+      <div class="form-row">
+        <label class="form-label">背景蒙版透明度（0 - 1）</label>
+        <div class="range-row">
+          <input
+            v-model.number="form.bg_opacity"
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            class="range-input"
+          />
+          <span class="range-value">{{ form.bg_opacity.toFixed(2) }}</span>
+        </div>
       </div>
 
-      <div class="form-group">
-        <label for="glass_opacity">
-          毛玻璃透明度: {{ Number(settings.glass_opacity).toFixed(2) }}
-        </label>
-        <input 
-          id="glass_opacity"
-          type="range"
-          v-model.number="settings.glass_opacity" 
-          min="0.0"
-          max="1.0"
-          step="0.01"
-          class="slider"
-        />
-        <p class="input-hint">值越小，毛玻璃越透明。推荐 0.6 ~ 0.8。 (控制菜单栏、卡片、搜索框)</p>
+      <div class="form-row">
+        <label class="form-label">卡片毛玻璃透明度（0 - 1）</label>
+        <div class="range-row">
+          <input
+            v-model.number="form.glass_opacity"
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            class="range-input"
+          />
+          <span class="range-value">{{ form.glass_opacity.toFixed(2) }}</span>
+        </div>
       </div>
 
-      <div class="form-group">
-        <label for="custom_css">自定义 CSS</label>
-        <textarea 
-          id="custom_css"
-          v-model="settings.custom_css" 
-          placeholder="/* 您的自定义样式 */&#10;body {&#10;  /* 示例: 更改背景 */&#10;  /* background-color: #f0f0f0 !important; */&#10;}" 
-          class="input textarea"
-          rows="10"
+      <div class="form-row">
+        <label class="form-label">字体颜色模式</label>
+        <select v-model="form.text_color_mode" class="select">
+          <option value="auto">自动（根据背景蒙版透明度）</option>
+          <option value="black">始终黑色</option>
+          <option value="white">始终白色</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label class="form-label">自定义 CSS</label>
+        <textarea
+          v-model="form.custom_css"
+          class="textarea"
+          rows="8"
+          placeholder="可以在这里写自定义 CSS，例如：
+.home-container { font-size: 15px; }"
         ></textarea>
-        <p class="input-hint">您在这里编写的CSS将被应用到网站的每一个页面。</p>
       </div>
 
       <div class="form-actions">
-        <button class="btn" @click="saveSettings" :disabled="isLoading">
-          {{ isLoading ? '保存中...' : '保存设置' }}
+        <button class="btn primary" @click="handleSave" :disabled="saving">
+          {{ saving ? '保存中...' : '保存设置' }}
         </button>
-      </div>
-      
-      <div v-if="message" :class="['message', messageType]">
-        {{ message }}
+        <span v-if="message" class="save-message">{{ message }}</span>
       </div>
     </div>
   </div>
@@ -92,212 +85,186 @@
 import { ref, onMounted } from 'vue';
 import { getSettings, updateSettings } from '../../api';
 
-const settings = ref({
+const form = ref({
   bg_url_pc: '',
   bg_url_mobile: '',
-  bg_opacity: 0.15,
-  glass_opacity: 0.7, 
-  custom_css: '/* 自定义样式 */'
+  bg_opacity: 1,
+  glass_opacity: 1,
+  custom_css: '',
+  text_color_mode: 'auto'
 });
-const isLoading = ref(false);
+
+const saving = ref(false);
 const message = ref('');
-const messageType = ref('success');
 
 onMounted(async () => {
-  isLoading.value = true;
   try {
-    const response = await getSettings();
-    settings.value = {
-        ...settings.value, 
-        ...response.data   
-    };
-    
-    // ---
-    // 修复点 1：0.00 Bug (严格检查)
-    // ---
-    const rawBgOpacity = parseFloat(settings.value.bg_opacity);
-    settings.value.bg_opacity = isNaN(rawBgOpacity) ? 0.15 : rawBgOpacity;
+    const res = await getSettings();
+    const data = res.data || {};
 
-    const rawGlassOpacity = parseFloat(settings.value.glass_opacity);
-    settings.value.glass_opacity = isNaN(rawGlassOpacity) ? 0.7 : rawGlassOpacity;
-    // --- 修复结束 ---
+    form.value.bg_url_pc = data.bg_url_pc || '';
+    form.value.bg_url_mobile = data.bg_url_mobile || '';
+    form.value.custom_css = data.custom_css || '';
+    form.value.text_color_mode = data.text_color_mode || 'auto';
 
-  } catch (error) {
-    message.value = '加载设置失败: ' + error.message;
-    messageType.value = 'error';
-  } finally {
-    isLoading.value = false;
+    const bgOp = parseFloat(data.bg_opacity);
+    form.value.bg_opacity = isNaN(bgOp) ? 1 : bgOp;
+
+    const glassOp = parseFloat(data.glass_opacity);
+    form.value.glass_opacity = isNaN(glassOp) ? 1 : glassOp;
+  } catch (e) {
+    console.error('加载设置失败', e);
   }
 });
 
-async function saveSettings() {
-  isLoading.value = true;
+async function handleSave() {
+  if (saving.value) return;
+  saving.value = true;
   message.value = '';
+
   try {
-    const dataToSave = {
-        ...settings.value,
-        bg_opacity: String(settings.value.bg_opacity),
-        glass_opacity: String(settings.value.glass_opacity)
+    const payload = {
+      bg_url_pc: form.value.bg_url_pc,
+      bg_url_mobile: form.value.bg_url_mobile,
+      bg_opacity: String(form.value.bg_opacity),
+      glass_opacity: String(form.value.glass_opacity),
+      custom_css: form.value.custom_css,
+      text_color_mode: form.value.text_color_mode
     };
-    await updateSettings(dataToSave);
-    message.value = '设置已成功保存！';
-    messageType.value = 'success';
-    setTimeout(() => { message.value = ''; }, 3000); // 自动消失
-  } catch (error)
-{
-    message.value = '保存失败: ' + (error.response?.data?.error || error.message);
-    messageType.value = 'error';
-    setTimeout(() => { message.value = ''; }, 5000); // 自动消失
+
+    await updateSettings(payload);
+    message.value = '已保存';
+    setTimeout(() => {
+      message.value = '';
+    }, 2000);
+  } catch (e) {
+    console.error('保存设置失败', e);
+    message.value = '保存失败，请稍后再试';
   } finally {
-    isLoading.value = false;
+    saving.value = false;
   }
 }
 </script>
 
 <style scoped>
-.settings-manage {
+.site-settings {
+  width: 100%;
   max-width: 900px;
-  width: 95%;
-  margin: 20px auto;
+  margin: 0 auto;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.settings-card {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.08);
+  padding: 20px 20px 24px;
+  box-sizing: border-box;
+}
+
+.form-row {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 6px;
+  margin-bottom: 14px;
 }
-.settings-card {
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  padding: 24px 32px;
+
+.form-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #111827;
 }
-.card-title {
-  font-size: 1.75rem;
-  font-weight: 600;
-  /* --- 修复点 4：字体黑色 --- */
-  color: #000;
-  margin-top: 0;
-  margin-bottom: 16px;
+
+.input,
+.select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  font-size: 0.9rem;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  font-size: 0.9rem;
+  font-family: Consolas, Menlo, Monaco, monospace;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.range-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.range-input {
+  flex: 1;
+}
+
+.range-value {
+  min-width: 40px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  color: #374151;
+}
+
+.form-actions {
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-top: 10px;
 }
-.card-desc {
-  font-size: 1rem;
-  /* --- 修复点 4：字体黑色 --- */
-  color: #000;
-  line-height: 1.6;
-  margin-bottom: 24px;
-}
-.form-group {
-  margin-bottom: 20px;
-}
-.form-group label {
-  display: block;
-  font-size: 1rem;
-  font-weight: 500;
-  /* --- 修复点 4：字体黑色 --- */
-  color: #000;
-  margin-bottom: 8px;
-}
-.input {
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid #d0d7e2;
-  background: #fff;
-  /* --- 修复点 4：字体黑色 --- */
-  color: #000;
-  font-size: 0.9rem;
-  transition: all 0.2s ease;
-  box-sizing: border-box; 
-}
-.input:focus {
-  outline: none;
-  border-color: #399dff;
-  box-shadow: 0 0 0 3px rgba(57, 157, 255, 0.1);
-}
-.input-hint {
-  font-size: 0.85rem;
-  color: #666;
-  margin-top: 6px;
-}
-.textarea {
-  font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
-  font-size: 0.9rem;
-  line-height: 1.5;
-  min-height: 150px;
-  resize: vertical;
-}
-.slider {
-  width: 100%;
-  -webkit-appearance: none;
-  appearance: none;
-  height: 8px;
-  background: #eaf1ff;
-  border-radius: 5px;
-  outline: none;
-  opacity: 0.7;
-  transition: opacity .2s;
-}
-.slider:hover {
-  opacity: 1;
-}
-.slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 20px;
-  height: 20px;
-  background: #2566d8;
-  border-radius: 50%;
-  cursor: pointer;
-  box-shadow: 0 0 5px rgba(0,0,0,0.2);
-}
-.slider::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
-  background: #2566d8;
-  border-radius: 50%;
-  cursor: pointer;
-  box-shadow: 0 0 5px rgba(0,0,0,0.2);
-}
-.form-actions {
-  margin-top: 16px;
-  border-top: 1px solid #e3e6ef;
-  padding-top: 20px;
-}
+
 .btn {
-  padding: 12px 20px;
   border: none;
-  border-radius: 8px;
-  background: #2566d8;
-  color: white;
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-size: 0.9rem;
+  font-weight: 500;
   cursor: pointer;
-  font-weight: 500;
-  font-size: 1rem;
-  transition: all 0.2s;
 }
-.btn:hover:not(:disabled) {
-  background: #174ea6;
+
+.btn.primary {
+  background: #2563eb;
+  color: #ffffff;
 }
-.btn:disabled {
-  background: #ccc;
-  cursor: not-allowed;
+
+.btn.primary:hover {
+  background: #1d4ed8;
 }
-.message {
-  margin-top: 20px;
-  padding: 12px;
-  border-radius: 8px;
-  font-weight: 500;
-  opacity: 1;
-  transition: opacity 0.5s ease;
+
+.btn.primary:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
-.message.success {
-  background: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
+
+.save-message {
+  font-size: 0.85rem;
+  color: #16a34a;
 }
-.message.error {
-  background: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
+
+@media (max-width: 768px) {
+  .site-settings {
+    padding: 8px;
+  }
+
+  .settings-card {
+    padding: 16px 12px 18px;
+  }
 }
 </style>

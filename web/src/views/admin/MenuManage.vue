@@ -18,7 +18,6 @@
     <div class="menu-content">
       <div class="menu-list">
         <div v-for="menu in menus" :key="menu.id" class="menu-item">
-          <!-- 主菜单 -->
           <div class="main-menu">
             <div class="menu-info">
               <div class="menu-icon">
@@ -47,7 +46,6 @@
             </div>
           </div>
           
-          <!-- 子菜单区域 -->
           <div class="sub-menu-section" :class="{ 'expanded': menu.showSubMenu }">
             <div class="sub-menu-header">
               <div class="sub-menu-title">
@@ -89,9 +87,6 @@
             </div>
             
             <div v-else class="empty-sub-menu">
-              <!-- <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-              <path d="M9 11H1l8-8 8 8h-8v8z"/>
-              </svg> -->
               <p>暂无子菜单</p>
               <button class="btn btn-sm btn-outline" @click="addSubMenu(menu.id)">添加第一个子菜单</button>
             </div>
@@ -121,10 +116,14 @@ onMounted(loadMenus);
 
 async function loadMenus() {
   const res = await getMenus();
-  menus.value = res.data.map(menu => ({
-    ...menu,
-    showSubMenu: false // 添加展开状态
-  }));
+  const oldMenus = menus.value || [];
+  menus.value = res.data.map(menu => {
+    const old = oldMenus.find(m => m.id === menu.id);
+    return {
+      ...menu,
+      showSubMenu: old ? !!old.showSubMenu : false
+    };
+  });
 }
 
 async function addMenu() {
@@ -181,47 +180,50 @@ function toggleSubMenu(menuId) {
 </script>
 
 <style scoped>
+* {
+  box-sizing: border-box;
+}
+
 .menu-manage {
   max-width: 1200px;
-  width: 95%;
+  width: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding: 0 8px;
+  overflow-x: hidden;
 }
-
-
 
 .menu-header {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 16px;
-  padding: 32px;
-  margin-bottom: 20px;
+  padding: 24px 20px;
+  margin-bottom: 16px;
   color: white;
   box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
-  width: 94%;
+  width: 100%;
   text-align: center;
 }
 
 .header-content {
-  margin-bottom: 15px;
+  margin-bottom: 12px;
   text-align: center;
 }
 
 .page-title {
   font-size: 1.5rem;
   font-weight: 700;
-  margin: 0 0 8px 0;
+  margin: 0 0 6px 0;
   letter-spacing: -0.5px;
 }
 
-
-
 .menu-add {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
   justify-content: center;
+  width: 100%;
 }
 
 .menu-content {
@@ -253,16 +255,18 @@ function toggleSubMenu(menuId) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24px 32px;
+  padding: 20px 24px;
   background: white;
   transition: all 0.3s ease;
+  width: 100%;
 }
 
 .menu-info {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   flex: 1;
+  min-width: 0;
 }
 
 .menu-icon {
@@ -278,14 +282,15 @@ function toggleSubMenu(menuId) {
 }
 
 .menu-name-input {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 600;
   border: 2px solid transparent;
   background: transparent;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-radius: 8px;
   color: #1e293b;
-  min-width: 200px;
+  width: 100%;
+  max-width: 100%;
   transition: all 0.2s ease;
 }
 
@@ -298,7 +303,8 @@ function toggleSubMenu(menuId) {
 .menu-order {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .order-label {
@@ -309,7 +315,7 @@ function toggleSubMenu(menuId) {
 
 .order-input {
   width: 60px;
-  padding: 6px 8px;
+  padding: 5px 6px;
   border: 1px solid #e2e8f0;
   border-radius: 6px;
   text-align: center;
@@ -324,7 +330,8 @@ function toggleSubMenu(menuId) {
 
 .menu-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .sub-menu-section {
@@ -343,7 +350,7 @@ function toggleSubMenu(menuId) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 32px;
+  padding: 8px 24px;
   background: #f1f5f9;
   border-bottom: 1px solid #e2e8f0;
 }
@@ -358,14 +365,14 @@ function toggleSubMenu(menuId) {
 }
 
 .sub-menu-list {
-  padding: 16px 32px 16px 48px;
+  padding: 14px 24px 14px 40px;
   position: relative;
 }
 
 .sub-menu-list::before {
   content: '';
   position: absolute;
-  left: 32px;
+  left: 24px;
   top: 0;
   bottom: 0;
   width: 2px;
@@ -377,7 +384,7 @@ function toggleSubMenu(menuId) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 20px;
+  padding: 8px 14px;
   background: white;
   border-radius: 12px;
   margin-bottom: 5px;
@@ -385,14 +392,15 @@ function toggleSubMenu(menuId) {
   border: 1px solid #e2e8f0;
   transition: all 0.2s ease;
   position: relative;
+  width: 100%;
 }
 
 .sub-menu-item::before {
   content: '';
   position: absolute;
-  left: -16px;
+  left: -14px;
   top: 50%;
-  width: 12px;
+  width: 10px;
   height: 2px;
   background: #cbd5e1;
   transform: translateY(-50%);
@@ -411,8 +419,9 @@ function toggleSubMenu(menuId) {
 .sub-menu-info {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex: 1;
+  min-width: 0;
 }
 
 .sub-menu-icon {
@@ -428,13 +437,14 @@ function toggleSubMenu(menuId) {
 }
 
 .sub-menu-name-input {
-  font-size: 1rem;
+  font-size: 0.95rem;
   border: 2px solid transparent;
   background: transparent;
-  padding: 6px 10px;
+  padding: 5px 8px;
   border-radius: 6px;
   color: #374151;
-  min-width: 150px;
+  width: 100%;
+  max-width: 100%;
   transition: all 0.2s ease;
 }
 
@@ -447,31 +457,32 @@ function toggleSubMenu(menuId) {
 .sub-menu-order {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .sub-menu-actions {
   display: flex;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .empty-sub-menu {
-  padding: 10px 0px 10px 0px;
+  padding: 10px 0;
   text-align: center;
   color: #64748b;
 }
 
 .empty-sub-menu p {
   color: #079f1e;
-  margin: 0 0 16px 0;
-  font-size: 1rem;
+  margin: 0 0 12px 0;
+  font-size: 0.95rem;
 }
 
-/* 按钮样式 */
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 16px;
+  padding: 8px 14px;
   border: none;
   border-radius: 8px;
   font-size: 0.9rem;
@@ -513,38 +524,38 @@ function toggleSubMenu(menuId) {
 }
 
 .btn-icon {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   padding: 0;
   justify-content: center;
   border-radius: 8px;
 }
 
-/* 展开子菜单按钮样式 */
 .btn-icon.expand-btn {
-  width: 200px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
 }
 
 .btn-sm {
-  padding: 6px 12px;
+  padding: 6px 10px;
   font-size: 0.8rem;
 }
 
 .btn-icon.btn-sm {
-  width: 35px;
-  height: 30px;
+  width: 30px;
+  height: 28px;
 }
 
 .input {
-  padding: 12px 16px;
+  padding: 10px 12px;
   border: 2px solid #e2e8f0;
   border-radius: 8px;
-  font-size: 1rem;
+  font-size: 0.95rem;
   background: white;
   color: #1e293b;
   transition: all 0.2s ease;
-  min-width: 200px;
+  width: 100%;
+  max-width: 420px;
 }
 
 .input:focus {
@@ -557,106 +568,155 @@ function toggleSubMenu(menuId) {
   color: #94a3b8;
 }
 
-/* 响应式设计 */
 @media (max-width: 768px) {
   .menu-manage {
-    width: 93%;
-    padding: 16px;
+    padding: 10px 6px;
   }
   
   .menu-header {
-    padding: 24px 20px;
+    padding: 18px 12px;
+    margin-bottom: 10px;
+    border-radius: 12px;
   }
   
   .page-title {
-    font-size: 1.5rem;
+    font-size: 1.2rem;
   }
   
   .menu-add {
     flex-direction: column;
     align-items: stretch;
-  }
-  
-  .input {
-    min-width: 0;
-  }
-  
-  .main-menu {
-    padding: 20px;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 16px;
-  }
-  
-  .menu-info {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-  
-  .menu-name-input {
-    min-width: 0;
-  }
-  
-  .menu-order {
-    justify-content: center;
-  }
-  
-  .menu-actions {
-    justify-content: center;
-  }
-  
-  .btn-icon.expand-btn {
-    width: 40px;
-    height: 32px;
-  }
-  
-  .sub-menu-header {
-    padding: 16px 20px;
-    flex-direction: column;
-    gap: 12px;
-    align-items: stretch;
-  }
-  
-  .sub-menu-list {
-    padding: 12px 20px 12px 32px;
-  }
-  
-  .sub-menu-list::before {
-    left: 20px;
-  }
-  
-  .sub-menu-item::before {
-    left: -12px;
-    width: 8px;
-  }
-  
-  .sub-menu-item {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-  
-  .sub-menu-info {
-    flex-direction: column;
-    align-items: stretch;
     gap: 8px;
   }
   
+  .input {
+    width: 100%;
+    max-width: 100%;
+    padding: 8px 10px;
+    font-size: 0.9rem;
+  }
+  
+  .menu-content {
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+  }
+  
+  .main-menu {
+    padding: 12px 10px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 8px;
+    row-gap: 8px;
+  }
+  
+  .menu-info {
+    gap: 8px;
+  }
+  
+  .menu-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+  }
+  
+  .menu-name-input {
+    font-size: 0.9rem;
+    padding: 4px 6px;
+  }
+  
+  .menu-order {
+    gap: 4px;
+  }
+  
+  .order-label {
+    font-size: 0.75rem;
+  }
+  
+  .order-input {
+    width: 48px;
+    padding: 3px 4px;
+    font-size: 0.8rem;
+  }
+  
+  .menu-actions {
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  
+  .btn {
+    padding: 6px 8px;
+    font-size: 0.8rem;
+  }
+  
+  .btn-icon {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .btn-icon.expand-btn {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .sub-menu-header {
+    padding: 8px 10px;
+  }
+  
+  .sub-menu-title {
+    font-size: 0.85rem;
+  }
+  
+  .sub-menu-list {
+    padding: 8px 10px 8px 24px;
+  }
+  
+  .sub-menu-list::before {
+    left: 16px;
+  }
+  
+  .sub-menu-item::before {
+    left: -8px;
+    width: 6px;
+  }
+  
+  .sub-menu-item {
+    padding: 8px 8px;
+    margin-bottom: 6px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 6px;
+    align-items: center;
+  }
+  
+  .sub-menu-info {
+    gap: 6px;
+  }
+  
+  .sub-menu-icon {
+    width: 24px;
+    height: 24px;
+  }
+  
   .sub-menu-name-input {
-    min-width: 0;
+    font-size: 0.85rem;
+    padding: 3px 4px;
   }
   
   .sub-menu-order {
-    justify-content: center;
+    justify-content: flex-start;
   }
   
   .sub-menu-actions {
-    justify-content: center;
+    justify-content: flex-end;
+  }
+  
+  .btn-icon.btn-sm {
+    width: 26px;
+    height: 26px;
   }
   
   .empty-sub-menu {
-    padding: 10px 0px 10px 0px;
+    padding: 8px 0;
   }
 }
-</style> 
+</style>

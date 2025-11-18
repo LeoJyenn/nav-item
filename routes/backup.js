@@ -5,8 +5,7 @@ const auth = require('./authMiddleware');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() }); 
 
-// (包含 'settings' 表)
-const TABLES_TO_BACKUP = ['menus', 'sub_menus', 'cards', 'users', 'ads', 'friends', 'settings'];
+const TABLES_TO_BACKUP = ['menus', 'sub_menus', 'cards', 'ads', 'friends', 'settings'];
 
 // 1. 导出 (GET /api/backup/export)
 router.get('/export', auth, async (req, res) => {
@@ -64,18 +63,24 @@ router.post('/import', auth, upload.single('backupFile'), async (req, res) => {
       tablesToImport.forEach(table => {
         db.run(`DELETE FROM ${table}`);
       });
-      db.run(`DELETE FROM sqlite_sequence WHERE name IN (${tablesToImport.map(t => `'${t}'`).join(', ')})`);
+
+      db.run(
+        `DELETE FROM sqlite_sequence WHERE name IN (${tablesToImport
+          .map(t => `'${t}'`)
+          .join(', ')})`
+      );
 
       for (const tableName of tablesToImport) {
         const rows = backupData[tableName];
-        if (rows.length === 0) continue;
+        if (!rows || rows.length === 0) continue;
 
         const keys = Object.keys(rows[0]);
-        // (修复: "order" -> `"${key}"`)
         const quotedKeys = keys.map(key => `"${key}"`); 
         const placeholders = keys.map(() => '?').join(', ');
         
-        const stmt = db.prepare(`INSERT INTO ${tableName} (${quotedKeys.join(', ')}) VALUES (${placeholders})`);
+        const stmt = db.prepare(
+          `INSERT INTO ${tableName} (${quotedKeys.join(', ')}) VALUES (${placeholders})`
+        );
 
         rows.forEach(row => {
           const values = keys.map(key => row[key]);

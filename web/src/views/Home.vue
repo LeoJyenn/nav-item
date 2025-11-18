@@ -1,7 +1,10 @@
 <template>
-  <div class="home-container" :style="backgroundStyles" @click="onBlankAreaClick">
-  
-    <div class="menu-bar-fixed">
+  <div
+    :class="['home-container', textModeClass, { 'is-dark-overlay': isDarkOverlay }]"
+    :style="containerStyles"
+    @click="onBlankAreaClick"
+  >
+    <div class="menu-bar-fixed" ref="menuBarContainer">
       <MenuBar 
         :ref="menuBarRef"
         :menus="menus" 
@@ -11,7 +14,7 @@
       />
     </div>
     
-    <div class="search-section">
+    <div class="search-section" :style="searchSectionStyle">
       <div class="search-box-wrapper">
         <div class="search-engine-select">
           <button v-for="engine in searchEngines" :key="engine.name"
@@ -21,10 +24,9 @@
             {{ engine.label }}
           </button>
           
-          <a href="/admin" target="_blank" class="engine-btn admin-btn">
+          <a href="/admin" class="engine-btn admin-btn">
             后台
           </a>
-
         </div>
         <div class="search-container">
           <input 
@@ -69,7 +71,10 @@
           </svg>
           友情链接
         </button>
-        <p class="copyright">Copyright © 2025 Nav-Item | <a href="https://github.com/LeoJyenn/nav-item" target="_blank" class="footer-link">Powered by LeoJyenn</a></p>
+        <p class="copyright">
+          Copyright © 2025 Nav-Item |
+          <a href="https://github.com/LeoJyenn/nav-item" target="_blank" class="footer-link">Powered by LeoJyenn</a>
+        </p>
       </div>
     </footer>
 
@@ -115,7 +120,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'; 
+import { ref, onMounted, computed, watch, nextTick, onBeforeUnmount } from 'vue'; 
 import { getMenus, getCards, getAds, getFriends, globalSearchCards, getSettings } from '../api'; 
 import MenuBar from '../components/MenuBar.vue';
 import CardGrid from '../components/CardGrid.vue';
@@ -133,15 +138,19 @@ const isGlobalSearchActive = ref(false);
 let debounceTimer = null;
 
 const menuBarRef = ref(null);
-
+const menuBarContainer = ref(null);
 const cardsCache = new Map();
+
+const isMobile = ref(false);
+const menuBarHeight = ref(0);
 
 const settings = ref({
   bg_url_pc: '',
   bg_url_mobile: '',
   bg_opacity: '1',
   glass_opacity: '1', 
-  custom_css: '' 
+  custom_css: '',
+  text_color_mode: 'auto'
 });
 
 const backgroundStyles = computed(() => {
@@ -180,8 +189,49 @@ const backgroundStyles = computed(() => {
   return styles;
 });
 
+const dynamicTextColor = computed(() => {
+  const mode = settings.value.text_color_mode || 'auto';
+  const op = parseFloat(settings.value.bg_opacity || '1');
+
+  if (mode === 'black') return '#000000';
+  if (mode === 'white') return '#ffffff';
+  return op <= 0.5 ? '#ffffff' : '#000000';
+});
+
+const isDarkOverlay = computed(() => {
+  const op = parseFloat(settings.value.bg_opacity || '1');
+  return op <= 0.5;
+});
+
+const containerStyles = computed(() => {
+  return {
+    ...backgroundStyles.value,
+    '--global-text-color': dynamicTextColor.value
+  };
+});
+
+const textModeClass = computed(() => {
+  const mode = settings.value.text_color_mode || 'auto';
+  if (mode === 'white') return 'text-mode-white';
+  if (mode === 'black') return 'text-mode-black';
+  return 'text-mode-auto';
+});
+
+const searchSectionStyle = computed(() => {
+  if (!isMobile.value) return {};
+  const extraGap = 13;
+  return {
+    marginTop: menuBarHeight.value > 0 ? `${menuBarHeight.value + extraGap}px` : '70px'
+  };
+});
 
 const searchEngines = [
+  {
+    name: 'site',
+    label: '站内',
+    placeholder: '站内搜索...',
+    url: q => `/search?query=${encodeURIComponent(q)}`
+  },
   {
     name: 'google',
     label: 'Google',
@@ -205,15 +255,11 @@ const searchEngines = [
     label: 'github',
     placeholder: 'GitHub 搜索...',
     url: q => `https://github.com/search?q=${encodeURIComponent(q)}&type=repositories`
-  },
-  {
-    name: 'site',
-    label: '站内',
-    placeholder: '站内搜索...',
-    url: q => `/search?query=${encodeURIComponent(q)}`
   }
 ];
-const selectedEngine = ref(searchEngines[0]);
+
+const selectedEngine = ref(searchEngines[0]); // 现在默认就是“站内”
+
 
 function selectEngine(engine) {
   selectedEngine.value = engine;
@@ -231,15 +277,37 @@ function clearSearch() {
   }
 }
 
+function measureMenuBar() {
+  if (!isMobile.value) {
+    menuBarHeight.value = 0;
+    return;
+  }
+  if (menuBarContainer.value) {
+    menuBarHeight.value = menuBarContainer.value.offsetHeight || 0;
+  }
+}
+
+const handleResize = () => {
+  isMobile.value = window.innerWidth <= 768;
+  nextTick(() => {
+    measureMenuBar();
+  });
+};
+
 onMounted(async () => {
+  isMobile.value = window.innerWidth <= 768;
+  window.addEventListener('resize', handleResize);
+
   getSettings().then(res => {
     settings.value = { ...settings.value, ...res.data };
   }).catch(err => {
     console.error("加载网站设置失败:", err);
   });
   
-  getMenus().then(res => {
+  getMenus().then(async res => {
     menus.value = res.data;
+    await nextTick();
+    measureMenuBar();
     if (menus.value.length) {
       activeMenu.value = menus.value[0];
       loadCards();
@@ -255,6 +323,20 @@ onMounted(async () => {
     friendLinks.value = friendRes.data;
   });
 });
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize);
+});
+
+watch(
+  () => menus.value,
+  () => {
+    nextTick(() => {
+      measureMenuBar();
+    });
+  },
+  { deep: true }
+);
 
 watch(() => settings.value.custom_css, (newCss) => {
   const styleId = 'custom-nav-style';
@@ -381,90 +463,47 @@ function handleLogoError(event) {
   display: flex;
   flex-direction: column;
   position: relative;
-  padding-top: 50px; 
-  isolation: isolate; 
+  padding-top: 50px;
+  isolation: isolate;
+  color: var(--global-text-color, #000);
+}
+
+.home-container * {
+  color: var(--global-text-color, #000) !important;
 }
 
 .home-container::before {
   content: '';
-  position: fixed; 
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
   height: 100lvh;
-  background-image: var(--dynamic-bg-pc); 
+  background-image: var(--dynamic-bg-pc);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  z-index: -2; 
+  z-index: -2;
 }
 
 .home-container::after {
   content: '';
-  position: fixed; 
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
   height: 100lvh;
   background: var(--dynamic-overlay-color, rgba(0, 0, 0, 0));
-  z-index: -1; 
+  z-index: -1;
 }
-
-@media (max-width: 768px) {
-  .home-container::before {
-    background-image: var(--dynamic-bg-mobile);
-  }
-
-  .home-container {
-    padding-top: 80px;
-  }
-  .content-wrapper {
-    gap: 0.5rem;
-  }
-  .ad-space {
-    height: 60px;
-  }
-  .ad-placeholder {
-    height: 50px;
-    font-size: 12px;
-    padding: 1rem 0.5rem;
-  }
-  .footer {
-    padding-top: 2rem;
-  }
-  
-  .footer-content {
-    /* 修改这里：保持水平布局，与PC端一致 */
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 20px;
-    padding: 0 10px;
-  }
-  
-  .friend-link-btn {
-    font-size: 0.7rem;
-  }
-  .copyright {
-    font-size: 0.7rem;
-    margin: 0; /* 确保没有额外的外边距 */
-  }
-
-  .friend-links-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  .container {
-    width: 95%;
-  }
-}
-
 
 .menu-bar-fixed {
   position: fixed;
   top: 0;
   padding-top: env(safe-area-inset-top);
   left: 0;
-  width: 100vw;
+  right: 0;
+  width: 100%;
   z-index: 100;
   backdrop-filter: blur(10px);
   background-color: rgba(var(--glass-color-rgb), var(--glass-opacity));
@@ -472,6 +511,7 @@ function handleLogoError(event) {
   border-bottom: 1px solid rgba(255, 255, 255, 0.18);
   transition: background-color 0.3s ease;
 }
+
 .search-container {
   display: flex;
   align-items: center;
@@ -498,42 +538,52 @@ function handleLogoError(event) {
   padding-bottom: .3rem;
   gap: 5px;
   z-index: 2;
-  flex-wrap: wrap; 
+  flex-wrap: wrap;
 }
+
 .engine-btn {
   border: none;
   background: none;
-  color: #000;
-  font-size: .8rem ;
+  font-size: .8rem;
   padding: 2px 10px;
   border-radius: 4px;
   cursor: pointer;
   transition: color 0.2s, background 0.2s;
-  display: inline-flex; 
-  align-items: center; 
-  gap: 4px; 
-  text-decoration: none; 
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
 }
-.engine-btn.active, .engine-btn:hover {
-  color: #399dff;
+
+.engine-btn.active,
+.engine-btn:hover {
   background: #eeeeee;
 }
-.admin-btn {
+
+/* 后台按钮：不参与 active/hover 的高亮，避免返回时看起来被选中 */
+.engine-btn.admin-btn,
+.engine-btn.admin-btn:hover,
+.engine-btn.admin-btn:active,
+.engine-btn.admin-btn:focus {
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
 }
-.admin-btn:hover {
-}
+
 .search-input {
   flex: 1;
   border: none;
   background: transparent;
   padding: .1rem .5rem;
   font-size: 1.2rem;
-  color: #000;
   outline: none;
 }
+
 .search-input::placeholder {
   color: #888;
 }
+
 .clear-btn {
   background: none;
   border: none;
@@ -544,12 +594,13 @@ function handleLogoError(event) {
   align-items: center;
   padding: 0;
 }
+
 .clear-btn svg {
   stroke: #000;
 }
+
 .search-btn {
   background: #e9e9eb00;
-  color: #000;
   border: none;
   border-radius: 50%;
   width: 40px;
@@ -561,19 +612,22 @@ function handleLogoError(event) {
   transition: background 0.2s;
   margin-right: 0.1rem;
 }
+
 .search-btn:hover {
   background: #3367d6;
   color: #ffffff;
 }
+
 .search-section {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2.8rem 0;
+  padding: 1.4rem 0;
   position: relative;
   z-index: 2;
 }
+
 .search-box-wrapper {
   display: flex;
   flex-direction: column;
@@ -581,6 +635,7 @@ function handleLogoError(event) {
   width: 100%;
   max-width: 480px;
 }
+
 .content-wrapper {
   display: flex;
   max-width: 1400px;
@@ -591,10 +646,12 @@ function handleLogoError(event) {
   flex: 1;
   justify-content: space-between;
 }
+
 .main-content {
   flex: 1;
   min-width: 0;
 }
+
 .ad-space {
   width: 90px;
   min-width: 60px;
@@ -606,20 +663,23 @@ function handleLogoError(event) {
   background: transparent;
   margin: 0;
 }
+
 .ad-space a {
   width: 100%;
   display: block;
 }
+
 .ad-space img {
   width: 100%;
   max-width: 90px;
   max-height: 160px;
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
   background: #fff;
   object-fit: contain;
   margin: 0 auto;
 }
+
 .ad-placeholder {
   background: rgba(0, 0, 0, 0.05);
   border: 2px dashed rgba(0, 0, 0, 0.2);
@@ -634,6 +694,7 @@ function handleLogoError(event) {
   align-items: center;
   justify-content: center;
 }
+
 .footer {
   margin-top: auto;
   text-align: center;
@@ -642,27 +703,37 @@ function handleLogoError(event) {
   position: relative;
   z-index: 2;
 }
+
 .footer-content {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 50px;
+  gap: 40px;
 }
+
 .friend-link-btn {
   display: flex;
   align-items: center;
   gap: 8px;
   background: none;
   border: none;
-  color: #000;
   cursor: pointer;
   transition: all 0.3s ease;
   font-size: 14px;
   padding: 0;
 }
-.friend-link-btn:hover {
-  color: #1976d2;
+
+.copyright {
+  font-size: 14px;
+  margin: 0;
+  text-shadow: none;
 }
+
+.footer-link {
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -676,6 +747,7 @@ function handleLogoError(event) {
   z-index: 1000;
   backdrop-filter: blur(5px);
 }
+
 .modal-content {
   background: #ffffff;
   border-radius: 16px;
@@ -688,6 +760,7 @@ function handleLogoError(event) {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   overflow: hidden;
 }
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -696,35 +769,38 @@ function handleLogoError(event) {
   border-bottom: 1px solid #e5e7eb;
   background: #f9f9ff;
 }
+
 .modal-header h3 {
   margin: 0;
   font-size: 24px;
   font-weight: 600;
-  color: #000;
 }
+
 .close-btn {
   background: none;
   border: none;
   cursor: pointer;
   padding: 8px;
   border-radius: 8px;
-  color: #6b7280;
   transition: all 0.2s;
 }
+
 .close-btn:hover {
   background: #f3f4f6;
-  color: #cf1313;
 }
+
 .modal-body {
   flex: 1;
   padding: 32px;
   overflow-y: auto;
 }
+
 .friend-links-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   gap: 12px;
 }
+
 .friend-link-card {
   display: flex;
   flex-direction: column;
@@ -733,15 +809,16 @@ function handleLogoError(event) {
   background: #f5f5f5;
   border-radius: 15px;
   text-decoration: none;
-  color: inherit;
   transition: all 0.2s ease;
   border: 1px solid #eee;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
+
 .friend-link-card:hover {
-  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   background: #e9e9e9;
 }
+
 .friend-link-logo {
   width: 48px;
   height: 48px;
@@ -752,13 +829,15 @@ function handleLogoError(event) {
   align-items: center;
   justify-content: center;
   background: white;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
+
 .friend-link-logo img {
   width: 100%;
   height: 100%;
   object-fit: contain;
 }
+
 .friend-link-placeholder {
   width: 100%;
   height: 100%;
@@ -766,42 +845,30 @@ function handleLogoError(event) {
   align-items: center;
   justify-content: center;
   background: #e5e7eb;
-  color: #6b7280;
   font-size: 18px;
   font-weight: 600;
   border-radius: 8px;
 }
+
 .friend-link-info h4 {
   margin: 0;
   font-size: 13px;
   font-weight: 500;
-  color: #000;
   text-align: center;
   line-height: 1.3;
   word-break: break-all;
 }
-.copyright {
-  color: #000;
-  font-size: 14px;
-  margin: 0;
-  text-shadow: none;
-}
-.footer-link {
-  color: #000;
-  text-decoration: none;
-  transition: color 0.2s;
-}
-.footer-link:hover {
-  color: #1976d2;
-}
+
 :deep(.menu-bar) {
   position: relative;
   z-index: 2;
 }
+
 :deep(.card-grid) {
   position: relative;
   z-index: 2;
 }
+
 .ad-space-fixed {
   position: fixed;
   top: 13rem;
@@ -816,35 +883,137 @@ function handleLogoError(event) {
   background: transparent;
   margin: 0;
 }
+
 .left-ad-fixed {
   left: 0;
 }
+
 .right-ad-fixed {
   right: 0;
 }
+
 .ad-space-fixed a {
   width: 100%;
   display: block;
 }
+
 .ad-space-fixed img {
   width: 100%;
   max-width: 90px;
   max-height: 160px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
   background: #fff;
   margin: 0 auto;
 }
+
+/* 深蒙版时：被选中的搜索引擎文字保持黑色 */
+.home-container.is-dark-overlay .engine-btn.active {
+  color: #000000 !important;
+}
+
+/* 始终白色模式下：被选中的搜索引擎文字保持黑色 */
+.home-container.text-mode-white .engine-btn.active {
+  color: #000000 !important;
+}
+
+/* 深蒙版时：搜索框内文字为白色，placeholder 浅白 */
+.home-container.is-dark-overlay .search-input {
+  color: #ffffff !important;
+}
+
+.home-container.is-dark-overlay .search-input::placeholder {
+  color: rgba(255, 255, 255, 0.65) !important;
+}
+
+/* 深蒙版时：二级菜单文字保持黑色 */
+.home-container.is-dark-overlay :deep(.sub-menu),
+.home-container.is-dark-overlay :deep(.sub-menu-item) {
+  color: #000000 !important;
+}
+
+/* 始终白色模式下：二级菜单文字保持黑色 */
+.home-container.text-mode-white :deep(.sub-menu),
+.home-container.text-mode-white :deep(.sub-menu-item) {
+  color: #000000 !important;
+}
+
 @media (max-width: 1200px) {
   .content-wrapper {
     flex-direction: column;
     gap: 1rem;
   }
+
   .ad-space {
     width: 100%;
     height: 100px;
   }
+
   .ad-placeholder {
     height: 80px;
+  }
+}
+
+@media (max-width: 768px) {
+  .home-container::before {
+    background-image: var(--dynamic-bg-mobile);
+  }
+
+  .home-container {
+    padding-top: 0;
+  }
+
+  .search-section {
+    padding-top: 0.4rem;
+    padding-bottom: 1.2rem;
+  }
+
+  .search-box-wrapper {
+    max-width: 420px;
+  }
+
+  .content-wrapper {
+    gap: 0.5rem;
+  }
+
+  .ad-space {
+    height: 60px;
+  }
+
+  .ad-placeholder {
+    height: 50px;
+    font-size: 12px;
+    padding: 1rem 0.5rem;
+  }
+
+  .footer {
+    padding-top: 2rem;
+  }
+
+  .footer-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: nowrap;
+    gap: 12px;
+    padding: 0 12px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .friend-link-btn {
+    font-size: clamp(8px, 2.9vw, 13px);
+  }
+
+  .copyright {
+    font-size: clamp(8px, 2.9vw, 13px);
+  }
+
+  .friend-links-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .container {
+    width: 95%;
   }
 }
 </style>
