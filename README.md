@@ -81,6 +81,7 @@ nav-item/
 │               ├── FriendLinkManage.vue  # 友链管理
 │               ├── UserManage.vue        # 用户管理
 │               ├── BackupManage.vue      # ✅ 数据备份与恢复（调用 /api/backup）
+│				├── ImageUploadManage.vue # ✅ 图片上传
 │               └── SiteSettings.vue      # ✅ 网站外观设置（调用 /api/settings）
 ├── Dockerfile             # Docker 构建文件
 

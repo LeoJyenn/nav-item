@@ -195,6 +195,7 @@ function toggleSubMenu(menuId) {
   overflow-x: hidden;
 }
 
+/* 顶部渐变头部 */
 .menu-header {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 16px;
@@ -218,6 +219,7 @@ function toggleSubMenu(menuId) {
   letter-spacing: -0.5px;
 }
 
+/* 主菜单和子菜单列表卡片 */
 .menu-add {
   display: flex;
   gap: 10px;

@@ -39,6 +39,29 @@ export const uploadLogo = (file) => {
   return axios.post(`${BASE}/upload`, formData, { headers: { ...authHeaders(), 'Content-Type': 'multipart/form-data' } });
 };
 
+// 图片上传API
+export const uploadImageWithRemark = (file, remark = '') => {
+  const formData = new FormData();
+  formData.append('logo', file);
+  formData.append('remark', remark);
+  return axios.post(`${BASE}/upload`, formData, {
+    headers: { ...authHeaders(), 'Content-Type': 'multipart/form-data' }
+  });
+};
+
+export const getUploadImages = () => {
+  return axios.get(`${BASE}/upload/files`, {
+    headers: authHeaders()
+  });
+};
+
+// 图片删除API
+export const deleteUploadImage = (id) => {
+  return axios.delete(`${BASE}/upload/${id}`, {
+    headers: authHeaders()
+  });
+};
+
 // 广告API
 export const getAds = () => axios.get(`${BASE}/ads`);
 export const addAd = (data) => axios.post(`${BASE}/ads`, data, { headers: authHeaders() });

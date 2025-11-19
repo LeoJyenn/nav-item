@@ -1,41 +1,132 @@
 <template>
   <div class="ad-manage">
     <div class="ad-header">
-      <form class="ad-add-row" @submit.prevent="handleAddAd">
-        <input v-model="newAdImg" placeholder="广告图片链接" class="input" />
-        <input v-model="newAdUrl" placeholder="广告跳转链接" class="input" />
-        <select v-model="newAdPos" class="input select-input">
+      <div class="header-content">
+        <h2 class="page-title">广告管理</h2>
+      </div>
+      <div class="ad-add">
+        <input
+          v-model="newAdImg"
+          placeholder="广告图片链接"
+          class="input"
+        />
+        <input
+          v-model="newAdUrl"
+          placeholder="广告跳转链接"
+          class="input"
+        />
+        <select v-model="newAdPos" class="input">
           <option value="left">左侧广告</option>
           <option value="right">右侧广告</option>
         </select>
-        <button class="btn" type="submit">添加广告</button>
-      </form>
+        <button class="btn btn-block" @click="handleAddAd">
+          添加广告
+        </button>
+      </div>
     </div>
+
     <div class="ad-section">
       <h3 class="section-title">左侧广告列表</h3>
       <div class="ad-card">
         <table class="ad-table">
-          <thead><tr><th>图片</th><th>跳转链接</th><th>操作</th></tr></thead>
+          <thead>
+            <tr>
+              <th>图片链接</th>
+              <th>跳转链接</th>
+              <th>操作</th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="ad in leftAds" :key="ad.id">
-              <td><input v-model="ad.img" @blur="updateAd(ad)" class="input" /></td>
-              <td><input v-model="ad.url" @blur="updateAd(ad)" class="input" /></td>
-              <td><button class="btn btn-danger" @click="deleteAd(ad.id)">删除广告</button></td>
+              <td>
+                <input
+                  v-model="ad.img"
+                  @blur="updateAd(ad)"
+                  class="table-input"
+                  placeholder="广告图片链接"
+                />
+              </td>
+              <td>
+                <input
+                  v-model="ad.url"
+                  @blur="updateAd(ad)"
+                  class="table-input"
+                  placeholder="广告跳转链接"
+                />
+              </td>
+              <td class="td-actions">
+                <button
+                  class="btn btn-danger btn-icon"
+                  @click="deleteAd(ad.id)"
+                  title="删除"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                    <path d="M10 11v6M14 11v6" />
+                  </svg>
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
+
     <div class="ad-section">
       <h3 class="section-title">右侧广告列表</h3>
       <div class="ad-card">
         <table class="ad-table">
-          <thead><tr><th>图片</th><th>跳转链接</th><th>操作</th></tr></thead>
+          <thead>
+            <tr>
+              <th>图片链接</th>
+              <th>跳转链接</th>
+              <th>操作</th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="ad in rightAds" :key="ad.id">
-              <td><input v-model="ad.img" @blur="updateAd(ad)" class="input" /></td>
-              <td><input v-model="ad.url" @blur="updateAd(ad)" class="input" /></td>
-              <td><button class="btn btn-danger" @click="deleteAd(ad.id)">删除广告</button></td>
+              <td>
+                <input
+                  v-model="ad.img"
+                  @blur="updateAd(ad)"
+                  class="table-input"
+                  placeholder="广告图片链接"
+                />
+              </td>
+              <td>
+                <input
+                  v-model="ad.url"
+                  @blur="updateAd(ad)"
+                  class="table-input"
+                  placeholder="广告跳转链接"
+                />
+              </td>
+              <td class="td-actions">
+                <button
+                  class="btn btn-danger btn-icon"
+                  @click="deleteAd(ad.id)"
+                  title="删除"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                    <path d="M10 11v6M14 11v6" />
+                  </svg>
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -46,10 +137,16 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
-import { getAds, addAd as apiAddAd, updateAd as apiUpdateAd, deleteAd as apiDeleteAd } from '../../api';
+import {
+  getAds,
+  addAd as apiAddAd,
+  updateAd as apiUpdateAd,
+  deleteAd as apiDeleteAd
+} from '../../api';
 
 const leftAds = ref([]);
 const rightAds = ref([]);
+
 const newAdImg = ref('');
 const newAdUrl = ref('');
 const newAdPos = ref('left');
@@ -61,18 +158,30 @@ async function loadAds() {
   leftAds.value = res.data.filter(ad => ad.position === 'left');
   rightAds.value = res.data.filter(ad => ad.position === 'right');
 }
+
 async function handleAddAd() {
   if (!newAdImg.value || !newAdUrl.value) return;
-  await apiAddAd({ position: newAdPos.value, img: newAdImg.value, url: newAdUrl.value });
+
+  await apiAddAd({
+    position: newAdPos.value,
+    img: newAdImg.value,
+    url: newAdUrl.value
+  });
+
   newAdImg.value = '';
   newAdUrl.value = '';
   newAdPos.value = 'left';
+
   loadAds();
 }
+
 async function updateAd(ad) {
-  await apiUpdateAd(ad.id, { img: ad.img, url: ad.url });
-  loadAds();
+  await apiUpdateAd(ad.id, {
+    img: ad.img,
+    url: ad.url
+  });
 }
+
 async function deleteAd(id) {
   await apiDeleteAd(id);
   loadAds();
@@ -81,213 +190,229 @@ async function deleteAd(id) {
 
 <style scoped>
 .ad-manage {
-  max-width: 1400px;
-  width: 90%;
-  margin: 0 auto;
-}
-.page-title {
-  text-align: center;
-  font-size: 2rem;
-  font-weight: bold;
-  margin: 32px 0 32px 0;
-  letter-spacing: 2px;
-  color: #222;
-}
-.section-title {
-  text-align: left;
-  font-size: 1.2rem;
-  font-weight: bold;
-  margin-bottom: 12px;
-  color: #2566d8;
-}
-.ad-header {
-  height: 32px;
-  margin-bottom: 64px;
-}
-.ad-section {
-  margin-bottom: 32px;
-}
-.ad-add {
+  width: 100%;
+  margin: 0;
   display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+  box-sizing: border-box;
 }
-.ad-card {
-  width: 98%;
-  background: #fff;
+
+.ad-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-  padding: 20px 10px;
+  padding: 12px 16px 14px;
+  color: white;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+  width: calc(100% - 32px);
+  margin: 0 auto 8px;
+  box-sizing: border-box;
 }
-.input {
-  padding: 12px 8px;
-  border-radius: 8px;
-  border: 1px solid #d0d7e2;
-  background: #fff;
-  color: #222;
-  margin-right: 8px;
+
+.header-content {
+  margin-bottom: 8px;
 }
-.input:focus {
-  outline: 2px solid #2566d8;
+
+.page-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.5px;
 }
-.btn {
-  background: #2566d8;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  padding: 8px 18px;
-  cursor: pointer;
-  margin-right: 8px;
-  transition: background 0.2s;
+
+.ad-add {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  box-sizing: border-box;
 }
-.btn:hover {
-  background: #174ea6;
+
+.section-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 16px 0 8px;
+  color: #111827;
 }
-.btn-danger {
-  background: #e74c3c;
-  display: inline-block;
-  margin: 0 auto;
+
+.ad-section {
+  margin-bottom: 24px;
+  padding: 0 16px;
+  box-sizing: border-box;
 }
-.btn-danger:hover {
-  background: #c0392b;
+
+.ad-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.08);
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 0;
 }
+
 .ad-table {
   width: 100%;
   border-collapse: collapse;
+}
+
+.ad-table th,
+.ad-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+  box-sizing: border-box;
+}
+
+.ad-table th {
+  background: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.ad-table th:nth-child(1),
+.ad-table td:nth-child(1) {
+  width: 40%;
+}
+
+.ad-table th:nth-child(2),
+.ad-table td:nth-child(2) {
+  width: 45%;
+}
+
+.ad-table th:nth-child(3),
+.ad-table td:nth-child(3) {
+  width: 15%;
+}
+
+.td-actions {
+  text-align: center;
+}
+
+.input {
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid #d0d7e2;
   background: #fff;
   color: #222;
-  border-radius: 8px;
-  overflow: hidden;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  width: 100%;
+  height: 36px;
 }
-.ad-table th, .ad-table td {
-  padding: 10px 14px;
-  border: 1px solid #e3e6ef;
-}
-.ad-table th {
-  background: #f5f7fa;
-  color: #222;
-  font-weight: bold;
-}
-.ad-table td input {
-  width: 95%;
-  background: #f9f9f9;
-  color: #222;
-  border: 1px solid #d0d7e2;
+
+.table-input {
+  width: 100%;
+  padding: 6px 8px;
   border-radius: 4px;
-  padding: 4px 8px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #222;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  height: 32px;
 }
-.ad-table th:last-child,
-.ad-table td:last-child {
-  text-align: center;
-  vertical-align: middle;
+
+.table-input:focus,
+.input:focus {
+  outline: none;
+  border-color: #399dff;
+  box-shadow: 0 0 0 2px rgba(57, 157, 255, 0.1);
 }
-.ad-add-group {
-  display: flex;
-  gap: 32px;
-  justify-content: center;
-  align-items: flex-start;
-}
-.ad-add-block {
-  background: #f5f7fa;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-  padding: 24px 32px 16px 32px;
-  display: flex;
-  flex-direction: column;
+
+.btn {
+  padding: 0 12px;
+  min-width: 96px;
+  border: none;
+  border-radius: 4px;
+  background: #399dff;
+  color: white;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+  display: inline-flex;
   align-items: center;
-  min-width: 320px;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  box-sizing: border-box;
 }
-.ad-add-block .section-title {
-  margin-bottom: 12px;
-  color: #2566d8;
-  font-size: 1.1rem;
-  font-weight: bold;
-}
-.ad-add-block .input {
-  margin-bottom: 12px;
+
+.btn-block {
   width: 100%;
 }
-.ad-add-block .btn {
-  width: 100%;
-  font-size: 1rem;
-  padding: 10px 0;
+
+.btn-icon {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 4px;
 }
-.ad-add-row {
-  display: flex;
-  gap: 16px;
-  justify-content: center;
-  align-items: center;
-  background: linear-gradient(135deg,#667eea,#764ba2);
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-  padding: 24px 32px 16px 32px;
-  min-width: 600px;
+
+.btn:hover {
+  background: #2d7dd2;
+  transform: translateY(-1px);
 }
-.select-input {
-  min-width: 120px;
-  height: 38px;
+
+.btn-danger {
+  background: #ef4444;
 }
-.ad-add-row input[type="text"], .ad-add-row input.input {
-  width: 18rem !important;
-  min-width: 200px;
-  max-width: 100%;
+
+.btn-danger:hover {
+  background: #dc2626;
 }
+
 @media (max-width: 768px) {
-  .admin-content{
-    width: 92%;
+  .ad-header {
+    padding: 12px 10px 10px;
+    width: calc(100% - 20px);
+    margin: 0 auto 8px;
   }
-  .ad-manage {
-    width: 100%;
-    padding: 0 2vw;
+
+  .ad-add {
+    grid-template-columns: repeat(2, 1fr);
   }
-  .ad-header, .ad-add-row {
-    flex-direction: column;
-    gap: 8px;
-    min-width: 0;
-    width: 92%;
-    margin: 0 auto;
-    padding: 8px 0 !important;
-  }
+
   .ad-section {
-    width: 92%;
-    padding-top: 10rem;
-    margin-bottom: -8rem;
+    padding: 0 10px;
   }
+
   .ad-card {
-    width: 100%;
-    padding: 12px 2vw;
+    padding: 4px 0;
   }
+
   .ad-table {
-    display: block;
-    width: 100%;
-    overflow-x: auto;
-    font-size: 14px;
-  }
-  .ad-table thead, .ad-table tbody, .ad-table tr {
-    display: table;
     width: 100%;
     table-layout: fixed;
   }
-  .ad-table th, .ad-table td {
-    padding: 8px 6px;
-    font-size: 13px;
+
+  .ad-table th,
+  .ad-table td {
+    padding: 6px 8px;
+    font-size: 0.8rem;
+    word-break: break-all;
   }
-  .input, .select-input {
-    width: 84%;
-    min-width: 0;
-    margin-right: 0;
-    font-size: 14px;
-    padding: 8px 8px;
-    height: 32px !important;
-  }
-  .ad-add-row input.input {
-    margin: 0 auto;
-  }
+
   .btn {
-    width: 84%;
-    margin-right: 0;
-    padding: 8px 0;
-    font-size: 14px;
+    min-width: 80px;
+    height: 32px;
+    font-size: 0.8rem;
+  }
+
+  .btn-icon {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+  }
+
+  .input {
+    font-size: 0.8rem;
+    height: 32px;
   }
 }
-</style> 
+</style>

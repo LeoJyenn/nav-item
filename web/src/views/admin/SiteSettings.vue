@@ -1,5 +1,12 @@
 <template>
   <div class="site-settings">
+    <div class="settings-header">
+      <div class="header-content">
+        <h2 class="page-title">网站外观设置</h2>
+        <p class="page-subtitle">配置首页背景、文字颜色和自定义代码</p>
+      </div>
+    </div>
+
     <div class="settings-card">
       <div class="form-row">
         <label class="form-label">PC 端背景图片地址</label>
@@ -150,13 +157,43 @@ async function handleSave() {
   width: 100%;
   max-width: 900px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 0 16px 16px;
   box-sizing: border-box;
 }
 
+/* 顶部渐变头部，和其它管理页保持一致 */
+.settings-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px 12px 0 0;
+  padding: 12px 16px 10px;
+  color: #ffffff;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+  box-sizing: border-box;
+}
+
+.header-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.page-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.page-subtitle {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+/* 设置卡片紧挨着头部，整体像一张卡片 */
 .settings-card {
   background: #ffffff;
-  border-radius: 12px;
+  border-radius: 0 0 12px 12px;
   box-shadow: 0 4px 18px rgba(15, 23, 42, 0.08);
   padding: 20px 20px 24px;
   box-sizing: border-box;
@@ -260,7 +297,12 @@ async function handleSave() {
 
 @media (max-width: 768px) {
   .site-settings {
-    padding: 8px;
+    padding: 0 8px 8px;
+  }
+
+  .settings-header {
+    padding: 10px 12px 8px;
+    border-radius: 12px 12px 0 0;
   }
 
   .settings-card {

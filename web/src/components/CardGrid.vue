@@ -80,18 +80,23 @@ function handleClick(url) {
 }
 
 function getLogo(card) {
-  if (card.custom_logo_path) return 'http://localhost:3000/uploads/' + card.custom_logo_path;
+  if (card.custom_logo_path) return '/uploads/' + card.custom_logo_path;
   if (card.logo_url) return card.logo_url;
   try {
     const url = new URL(card.url);
     return url.origin + '/favicon.ico';
   } catch {
-    return '/default-favicon.png';
+    return '/icon.png';
   }
 }
 
 function onImgError(e, card) {
-  e.target.src = '/default-favicon.png';
+  if (e.target.dataset.fallbackApplied) {
+    e.target.style.display = 'none';
+    return;
+  }
+  e.target.dataset.fallbackApplied = '1';
+  e.target.src = '/icon.png';
 }
 
 function getTooltip(card) {

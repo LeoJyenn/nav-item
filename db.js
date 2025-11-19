@@ -74,6 +74,15 @@ db.serialize(() => {
     value TEXT
   )`);
   
+  db.run(`
+  CREATE TABLE IF NOT EXISTS uploads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    filename TEXT NOT NULL,
+    url TEXT NOT NULL,
+    remark TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
   const settingsStmt = db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)");
   settingsStmt.run('bg_url_pc', '');
   settingsStmt.run('bg_url_mobile', '');

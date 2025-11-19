@@ -240,13 +240,14 @@ async function fetchIconForExistingCard(card) {
 
 .card-header {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 0;
+  border-radius: 12px; /* 添加圆角效果 */
   padding: 12px 16px;
   color: white;
   box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
   width: 100%;
   box-sizing: border-box;
 }
+
 
 .header-content {
   margin-bottom: 8px;
@@ -496,4 +497,4 @@ async function fetchIconForExistingCard(card) {
     height: 32px;
   }
 }
-</style>
+</style> 
