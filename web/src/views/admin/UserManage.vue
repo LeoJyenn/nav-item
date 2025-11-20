@@ -1,13 +1,11 @@
 <template>
   <div class="user-manage">
-    <!-- 顶部渐变头部 -->
     <div class="user-header">
       <div class="header-content">
         <h2 class="page-title">用户与密码管理</h2>
       </div>
     </div>
 
-    <!-- 中间白色卡片 -->
     <div class="user-card">
       <div class="inner-card">
         <div class="password-section">
@@ -17,32 +15,17 @@
           <div class="password-form">
             <div class="form-group">
               <label>当前密码</label>
-              <input
-                v-model="oldPassword"
-                type="password"
-                placeholder="请输入当前密码"
-                class="input"
-              />
+              <input v-model="oldPassword" type="password" placeholder="请输入当前密码" class="input" />
             </div>
 
             <div class="form-group">
               <label>新密码</label>
-              <input
-                v-model="newPassword"
-                type="password"
-                placeholder="请输入新密码（至少 6 位）"
-                class="input"
-              />
+              <input v-model="newPassword" type="password" placeholder="请输入新密码（至少 6 位）" class="input" />
             </div>
 
             <div class="form-group">
               <label>确认新密码</label>
-              <input
-                v-model="confirmPassword"
-                type="password"
-                placeholder="请再次输入新密码"
-                class="input"
-              />
+              <input v-model="confirmPassword" type="password" placeholder="请再次输入新密码" class="input" />
             </div>
 
             <div class="form-actions">
@@ -58,7 +41,6 @@
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -78,9 +60,7 @@ onMounted(async () => {
   try {
     const response = await getUserProfile();
     userInfo.value = response.data;
-  } catch (error) {
-    console.error("获取用户信息失败:", error);
-  }
+  } catch (e) {}
 });
 
 async function handleChangePassword() {
@@ -105,7 +85,6 @@ async function handleChangePassword() {
   try {
     await changePassword(oldPassword.value, newPassword.value);
     showMessage("密码修改成功", "success");
-
     oldPassword.value = "";
     newPassword.value = "";
     confirmPassword.value = "";
@@ -139,9 +118,9 @@ function showMessage(text, type) {
   width: 100%;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
 }
 
-/* 顶部渐变头部（圆角 + 阴影） */
 .user-header {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 12px;
@@ -157,7 +136,6 @@ function showMessage(text, type) {
   margin: 0;
 }
 
-/* 中间白色内容卡片 */
 .user-card {
   width: 100%;
   padding: 0 16px;
@@ -173,9 +151,15 @@ function showMessage(text, type) {
   border-radius: 12px;
   box-shadow: 0 4px 18px rgba(15, 23, 42, 0.08);
   padding: 22px 24px;
+  box-sizing: border-box;
 }
 
-/* 标题 */
+.password-form,
+.form-group,
+.input {
+  box-sizing: border-box;
+}
+
 .section-title {
   text-align: center;
   font-size: 1.3rem;
@@ -190,13 +174,13 @@ function showMessage(text, type) {
   margin-bottom: 18px;
 }
 
-/* 表单 */
 .form-group {
   margin-bottom: 16px;
 }
 
 .input {
   width: 100%;
+  max-width: 100%;
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid #d0d7e2;
@@ -209,7 +193,6 @@ function showMessage(text, type) {
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
 
-/* 按钮 */
 .btn {
   background: #2563eb;
   color: #fff;
@@ -231,7 +214,6 @@ function showMessage(text, type) {
   cursor: not-allowed;
 }
 
-/* 提示信息 */
 .message {
   margin-top: 16px;
   padding: 10px;
@@ -249,7 +231,6 @@ function showMessage(text, type) {
   color: #b91c1c;
 }
 
-/* 移动端适配 */
 @media (max-width: 768px) {
   .user-header {
     margin: 0 10px 12px;
