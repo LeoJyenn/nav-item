@@ -1,3 +1,4 @@
+// src/api.js
 import axios from 'axios';
 const BASE = '/api';
 
@@ -9,11 +10,13 @@ axios.interceptors.response.use(
     const status = err.response?.status;
     const url = err.config?.url || '';
     const isProfileCheck = url.includes('/users/profile');
+    const isLogin = url.includes('/login');
 
     if (
       status === 401 &&
       window.location.pathname.startsWith('/admin') &&
       !isProfileCheck &&
+      !isLogin &&
       !showingLogoutAlert
     ) {
       showingLogoutAlert = true;
