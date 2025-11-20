@@ -153,6 +153,9 @@ const settings = ref({
   custom_code: ''
 });
 
+const prefersDark = ref(false);
+let colorSchemeMedia = null;
+
 function applyCustomCode(code) {
   if (typeof window === 'undefined') return;
 
@@ -167,7 +170,6 @@ function applyCustomCode(code) {
 
   if (!code || !code.trim()) return;
 
-  // 纯 JS（没有任何标签）时，直接当脚本执行
   if (!code.includes('<')) {
     const script = document.createElement('script');
     script.id = inlineScriptId;
@@ -176,7 +178,6 @@ function applyCustomCode(code) {
     return;
   }
 
-  // 含 HTML / style / script 的情况
   const wrapper = document.createElement('div');
   wrapper.id = containerId;
   wrapper.innerHTML = code;
@@ -194,51 +195,60 @@ function applyCustomCode(code) {
 }
 
 const backgroundStyles = computed(() => {
+  const isDark = prefersDark.value;
+  const styles = {};
+  const rawGlass = settings.value.glass_opacity;
+  const rawGlassOp = parseFloat(rawGlass);
+  const glassOpacity = isNaN(rawGlassOp) ? 0.7 : rawGlassOp;
+  styles['--glass-color-rgb'] = '255, 255, 255'; 
+  styles['--glass-opacity'] = glassOpacity;
+  const hoverOpacity = Math.min(glassOpacity + 0.15, 1.0);
+  styles['--glass-opacity-hover'] = hoverOpacity;
+  if (isDark) {
+    styles['--dynamic-bg-pc'] = '';
+    styles['--dynamic-bg-mobile'] = '';
+    styles['--dynamic-overlay-color'] = 'rgba(0, 0, 0, 0)';
+    return styles;
+  }
   const pcUrl = settings.value.bg_url_pc;
   const mobileUrl = settings.value.bg_url_mobile;
-  
   const rawBgOp = parseFloat(settings.value.bg_opacity);
   const opacity = isNaN(rawBgOp) ? 0.15 : rawBgOp; 
   const overlayTint = 1.0 - opacity; 
-  
-  const styles = {}; 
-
   if (pcUrl) {
     styles['--dynamic-bg-pc'] = `url(${pcUrl})`;
   }
   if (mobileUrl) {
     styles['--dynamic-bg-mobile'] = `url(${mobileUrl})`;
   }
-
   if (pcUrl || mobileUrl) {
     styles['--dynamic-overlay-color'] = `rgba(0, 0, 0, ${overlayTint})`;
   } else {
     styles['--dynamic-overlay-color'] = 'rgba(0, 0, 0, 0)';
   }
-
-  const rawGlass = settings.value.glass_opacity;
-  const rawGlassOp = parseFloat(rawGlass);
-  const glassOpacity = isNaN(rawGlassOp) ? 0.7 : rawGlassOp;
-  
-  styles['--glass-color-rgb'] = '255, 255, 255'; 
-  styles['--glass-opacity'] = glassOpacity;
-  
-  const hoverOpacity = Math.min(glassOpacity + 0.15, 1.0);
-  styles['--glass-opacity-hover'] = hoverOpacity;
-  
   return styles;
 });
 
 const dynamicTextColor = computed(() => {
   const mode = settings.value.text_color_mode || 'auto';
-  const op = parseFloat(settings.value.bg_opacity || '1');
+  const hasBgImage = !!(settings.value.bg_url_pc || settings.value.bg_url_mobile);
 
-  if (mode === 'black') return '#000000';
+  if (prefersDark.value) {
+    return '#ffffff';
+  }
+
+  if (!hasBgImage) {
+    return '#000000';
+  }
+
   if (mode === 'white') return '#ffffff';
-  return op <= 0.5 ? '#ffffff' : '#000000';
+  if (mode === 'black') return '#000000';
+
+  return '#000000';
 });
 
 const isDarkOverlay = computed(() => {
+  if (prefersDark.value) return true;
   const op = parseFloat(settings.value.bg_opacity || '1');
   return op <= 0.5;
 });
@@ -334,6 +344,20 @@ const handleResize = () => {
 };
 
 onMounted(async () => {
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    colorSchemeMedia = window.matchMedia('(prefers-color-scheme: dark)');
+    prefersDark.value = colorSchemeMedia.matches;
+    const handleSchemeChange = (e) => {
+      prefersDark.value = e.matches;
+    };
+    if (colorSchemeMedia.addEventListener) {
+      colorSchemeMedia.addEventListener('change', handleSchemeChange);
+    } else if (colorSchemeMedia.addListener) {
+      colorSchemeMedia.addListener(handleSchemeChange);
+    }
+    colorSchemeMedia._handler = handleSchemeChange;
+  }
+
   isMobile.value = window.innerWidth <= 768;
   window.addEventListener('resize', handleResize);
 
@@ -343,7 +367,6 @@ onMounted(async () => {
       ...settings.value,
       ...data
     };
-    // 兼容老版本：如果没有 custom_code，但有 custom_css，就用 custom_css
     if (!settings.value.custom_code && data.custom_css) {
       settings.value.custom_code = data.custom_css || '';
     }
@@ -373,6 +396,13 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize);
+  if (colorSchemeMedia && colorSchemeMedia._handler) {
+    if (colorSchemeMedia.removeEventListener) {
+      colorSchemeMedia.removeEventListener('change', colorSchemeMedia._handler);
+    } else if (colorSchemeMedia.removeListener) {
+      colorSchemeMedia.removeListener(colorSchemeMedia._handler);
+    }
+  }
 });
 
 watch(
