@@ -1,5 +1,4 @@
 <template>
-  <!-- 登录页 -->
   <div v-if="!isLoggedIn" class="login-container" :class="{ 'mobile-login': isMobile }">
     <div class="login-card">
       <h2 class="login-title">后台管理登录</h2>
@@ -11,7 +10,6 @@
           class="login-input"
           @keyup.enter="handleLogin"
         />
-
         <div class="password-input-wrapper">
           <input
             v-model="password"
@@ -56,7 +54,6 @@
             </svg>
           </span>
         </div>
-
         <div class="login-buttons" :class="{ 'mobile-stack': isMobile }">
           <button @click="goHome" class="back-btn">
             <svg
@@ -81,15 +78,12 @@
             {{ loading ? '登录中...' : '登录' }}
           </button>
         </div>
-
         <p v-if="loginError" class="login-error">{{ loginError }}</p>
       </div>
     </div>
   </div>
 
-  <!-- 后台布局 -->
   <div v-else class="admin-layout">
-    <!-- 透明遮罩：只在 siderOpen 时出现，点击关闭侧边栏，不改变视觉 UI -->
     <div
       v-if="siderOpen"
       class="sider-mask"
@@ -110,11 +104,10 @@
         <li :class="{active: page==='upload'}" @click="page='upload'; closeSider()">图片上传</li>
         <li :class="{active: page==='settings'}" @click="page='settings'; closeSider()">网站外观设置</li>
         <li :class="{active: page==='backup'}" @click="page='backup'; closeSider()">数据备份与恢复</li>
-		<li :class="{active: page==='user'}" @click="page='user'; closeSider()">用户管理</li>
+        <li :class="{active: page==='user'}" @click="page='user'; closeSider()">用户管理</li>
       </ul>
     </aside>
 
-    <!-- 这里不再绑定 closeSider，避免按钮点击被立刻关掉 -->
     <main class="admin-main">
       <div class="admin-header">
         <button class="menu-toggle" @click="toggleSider">
@@ -194,148 +187,141 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, onUnmounted } from 'vue';
-import { login } from '../api';
-import MenuManage from './admin/MenuManage.vue';
-import CardManage from './admin/CardManage.vue';
-import AdManage from './admin/AdManage.vue';
-import FriendLinkManage from './admin/FriendLinkManage.vue';
-import UserManage from './admin/UserManage.vue';
-import BackupManage from './admin/BackupManage.vue'; 
-import SiteSettings from './admin/SiteSettings.vue';
-import ImageUploadManage from './admin/ImageUploadManage.vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { login } from '../api'
+import MenuManage from './admin/MenuManage.vue'
+import CardManage from './admin/CardManage.vue'
+import AdManage from './admin/AdManage.vue'
+import FriendLinkManage from './admin/FriendLinkManage.vue'
+import UserManage from './admin/UserManage.vue'
+import BackupManage from './admin/BackupManage.vue'
+import SiteSettings from './admin/SiteSettings.vue'
+import ImageUploadManage from './admin/ImageUploadManage.vue'
 
-const page = ref('welcome');
-const lastLoginTime = ref('');
-const lastLoginIp = ref('');
-const isLoggedIn = ref(false);
-const username = ref('');
-const password = ref('');
-const loading = ref(false);
-const loginError = ref('');
-const showPassword = ref(false);
-const siderOpen = ref(false);
-const isMobile = ref(false);
+const page = ref('welcome')
+const lastLoginTime = ref('')
+const lastLoginIp = ref('')
+const isLoggedIn = ref(false)
+const username = ref('')
+const password = ref('')
+const loading = ref(false)
+const loginError = ref('')
+const showPassword = ref(false)
+const siderOpen = ref(false)
+const isMobile = ref(false)
 
 const pageTitle = computed(() => {
   switch (page.value) {
-    case 'menu': return '栏目管理';
-    case 'card': return '卡片管理';
-    case 'ad': return '广告管理';
-    case 'friend': return '友链管理';
-    case 'upload': return '图片上传管理';
-    case 'user': return '用户管理';
-    case 'backup': return '数据备份与恢复';
-    case 'settings': return '网站外观设置';
-    default: return '';
+    case 'menu': return '栏目管理'
+    case 'card': return '卡片管理'
+    case 'ad': return '广告管理'
+    case 'friend': return '友链管理'
+    case 'upload': return '图片上传管理'
+    case 'user': return '用户管理'
+    case 'backup': return '数据备份与恢复'
+    case 'settings': return '网站外观设置'
+    default: return ''
   }
-});
-
-function applyBodyOverflow() {
-  if (typeof window === 'undefined') return;
-  if (isMobile.value && !isLoggedIn.value) {
-    document.documentElement.style.overflow = 'hidden';
-    document.body.style.overflow = 'hidden';
-  } else {
-    document.documentElement.style.overflow = '';
-    document.body.style.overflow = '';
-  }
-}
+})
 
 function handleResize() {
-  if (typeof window === 'undefined') return;
-  const wasMobile = isMobile.value;
-  isMobile.value = window.innerWidth <= 768;
-  if (isMobile.value !== wasMobile) {
-    applyBodyOverflow();
-  }
+  if (typeof window === 'undefined') return
+  isMobile.value = window.innerWidth <= 768
 }
 
 onMounted(() => {
   if (typeof window !== 'undefined') {
-    isMobile.value = window.innerWidth <= 768;
-    window.addEventListener('resize', handleResize);
+    isMobile.value = window.innerWidth <= 768
+    window.addEventListener('resize', handleResize)
   }
-
-  const token = localStorage.getItem('token');
-  isLoggedIn.value = !!token;
+  const token = localStorage.getItem('token')
+  isLoggedIn.value = !!token
   if (isLoggedIn.value) {
-    fetchLastLoginInfo();
+    fetchLastLoginInfo()
   }
-
-  applyBodyOverflow();
-});
+  if (typeof window !== 'undefined') {
+    const savedError = sessionStorage.getItem('loginError') || ''
+    loginError.value = savedError
+  }
+})
 
 onUnmounted(() => {
   if (typeof window !== 'undefined') {
-    window.removeEventListener('resize', handleResize);
+    window.removeEventListener('resize', handleResize)
   }
-  document.documentElement.style.overflow = '';
-  document.body.style.overflow = '';
-});
-
-watch(isLoggedIn, () => {
-  applyBodyOverflow();
-});
+})
 
 async function fetchLastLoginInfo() {
   try {
     const res = await fetch('/api/users/me', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-    });
+    })
     if (res.ok) {
-      const data = await res.json();
-      lastLoginTime.value = data.last_login_time || '';
-      lastLoginIp.value = data.last_login_ip || '';
+      const data = await res.json()
+      lastLoginTime.value = data.last_login_time || ''
+      lastLoginIp.value = data.last_login_ip || ''
     }
   } catch (error) {
-    console.error('获取用户信息失败:', error);
+    console.error('获取用户信息失败:', error)
   }
 }
 
 async function handleLogin() {
   if (!username.value || !password.value) {
-    loginError.value = '请输入用户名和密码';
-    return;
+    loginError.value = '请输入用户名和密码'
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('loginError', loginError.value)
+    }
+    return
   }
-  
-  loading.value = true;
-  loginError.value = '';
-  
+  loading.value = true
+  loginError.value = ''
+  if (typeof window !== 'undefined') {
+    sessionStorage.removeItem('loginError')
+  }
   try {
-    const response = await login(username.value, password.value);
+    const response = await login(username.value, password.value)
     if (response.data.token) {
-      localStorage.setItem('token', response.data.token);
-      isLoggedIn.value = true;
-      lastLoginTime.value = response.data.lastLoginTime || '';
-      lastLoginIp.value = response.data.lastLoginIp || '';
+      localStorage.setItem('token', response.data.token)
+      isLoggedIn.value = true
+      lastLoginTime.value = response.data.lastLoginTime || ''
+      lastLoginIp.value = response.data.lastLoginIp || ''
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('loginError')
+      }
     }
   } catch (error) {
-    loginError.value = error.response?.data?.message || '登录失败，请检查用户名和密码';
+    loginError.value = error.response?.data?.message || '登录失败，请检查用户名和密码'
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('loginError', loginError.value)
+    }
   } finally {
-    loading.value = false;
+    loading.value = false
   }
 }
 
 function logout() {
-  localStorage.removeItem('token');
-  isLoggedIn.value = false;
-  username.value = '';
-  password.value = '';
-  loginError.value = '';
+  localStorage.removeItem('token')
+  isLoggedIn.value = false
+  username.value = ''
+  password.value = ''
+  loginError.value = ''
+  if (typeof window !== 'undefined') {
+    sessionStorage.removeItem('loginError')
+  }
 }
 
 function goHome() {
-  window.location.href = '/';
+  window.location.href = '/'
 }
 
 function toggleSider() {
-  siderOpen.value = !siderOpen.value;
+  siderOpen.value = !siderOpen.value
 }
 
 function closeSider() {
   if (typeof window !== 'undefined' && window.innerWidth <= 768) {
-    siderOpen.value = false;
+    siderOpen.value = false
   }
 }
 </script>
@@ -347,7 +333,6 @@ function closeSider() {
   margin: 8px 16px;
 }
 
-/* 透明遮罩层：只挡点击，不改变视觉 */
 .sider-mask {
   position: fixed;
   inset: 0;
@@ -355,7 +340,6 @@ function closeSider() {
   z-index: 150;
 }
 
-/* 登录页样式 */
 .login-container {
   display: flex;
   justify-content: center;
@@ -434,12 +418,12 @@ function closeSider() {
 }
 
 .back-btn {
-  flex: 1;       
-  white-space: nowrap; 
+  flex: 1;
+  white-space: nowrap;
 }
 
 .login-btn {
-  flex: 2;      
+  flex: 2;
 }
 
 .back-btn {
@@ -472,7 +456,6 @@ function closeSider() {
   font-size: 14px;
 }
 
-/* 后台布局样式 */
 .admin-layout {
   display: flex;
   min-height: 100vh;
@@ -753,7 +736,6 @@ function closeSider() {
   }
 }
 
-/* 移动端后台布局 */
 @media (max-width: 768px) {
   .admin-sider {
     position: fixed;
@@ -819,12 +801,12 @@ function closeSider() {
   }
 }
 
+.menu-toggle {
+  display: none;
+}
+
 .login-container.mobile-login {
   position: fixed;
   inset: 0;
-}
-
-.menu-toggle {
-  display: none;
 }
 </style>
