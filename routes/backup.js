@@ -28,21 +28,19 @@ router.get('/export', async (req, res) => {
     const archive = archiver('zip', { zlib: { level: 9 } });
 
     output.on('close', () => {
-      res.download(tempZipPath, backupName, (err) => {
+      res.download(tempZipPath, backupName, err => {
         try {
           if (fs.existsSync(tempZipPath)) {
             fs.unlinkSync(tempZipPath);
           }
-        } catch (e) {
-          console.warn('删除临时备份文件失败:', e);
-        }
+        } catch (_) {}
         if (err) {
-          console.error('下载备份文件时出错:', err);
+          console.error('下载备份文件出错:', err);
         }
       });
     });
 
-    archive.on('error', (err) => {
+    archive.on('error', err => {
       console.error('打包备份失败:', err);
       if (!res.headersSent) {
         res.status(500).json({ error: '备份失败' });
@@ -51,9 +49,7 @@ router.get('/export', async (req, res) => {
 
     archive.pipe(output);
 
-    if (!fs.existsSync(DB_FILE)) {
-      console.warn('数据库文件不存在:', DB_FILE);
-    } else {
+    if (fs.existsSync(DB_FILE)) {
       archive.file(DB_FILE, { name: 'database/nav.db' });
     }
 
@@ -131,13 +127,21 @@ router.post('/import', upload.any(), async (req, res) => {
     if (!fs.existsSync(DB_DIR)) {
       fs.mkdirSync(DB_DIR, { recursive: true });
     }
-
     fs.copyFileSync(dbInBackup, DB_FILE);
 
     const uploadsInBackup = path.join(extractRoot, 'uploads');
     if (fs.existsSync(uploadsInBackup) && fs.statSync(uploadsInBackup).isDirectory()) {
-      if (fs.existsSync(UPLOADS_DIR)) {
-        fs.rmSync(UPLOADS_DIR, { recursive: true, force: true });
+      if (!fs.existsSync(UPLOADS_DIR)) {
+        fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+      } else {
+        for (const name of fs.readdirSync(UPLOADS_DIR)) {
+          const target = path.join(UPLOADS_DIR, name);
+          try {
+            fs.rmSync(target, { recursive: true, force: true });
+          } catch (e) {
+            console.warn('删除 uploads 下文件失败:', target, e);
+          }
+        }
       }
       fs.cpSync(uploadsInBackup, UPLOADS_DIR, { recursive: true });
     }
