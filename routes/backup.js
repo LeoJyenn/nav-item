@@ -48,7 +48,6 @@ router.get('/export', async (req, res) => {
   try {
     const backupName = `backup_${Date.now()}.zip`;
     const tempPath = path.join(__dirname, `../temp/${backupName}`);
-
     const tempDir = path.join(__dirname, '../temp');
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
@@ -115,10 +114,10 @@ router.post('/import', upload.any(), async (req, res) => {
     const dbDir = path.join(extractRoot, 'database');
     const uploadsDir = path.join(extractRoot, 'uploads');
 
-    if (!hasDatabaseRoot || !fs.existsSync(dbDir)) {
+    if (!fs.existsSync(dbDir)) {
       missing.push('database 目录');
     }
-    if (!hasUploadsRoot || !fs.existsSync(uploadsDir)) {
+    if (!fs.existsSync(uploadsDir)) {
       missing.push('uploads 目录');
     }
 
