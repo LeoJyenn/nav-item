@@ -1,50 +1,83 @@
 const express = require('express');
-const router = express.Router();
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const archiver = require('archiver');
 const unzipper = require('unzipper');
 
-const upload = multer({ dest: path.join(__dirname, '../temp') });
+const router = express.Router();
+
+const PROJECT_ROOT = path.join(__dirname, '..');
+const DB_DIR = path.join(PROJECT_ROOT, 'database');
+const DB_FILE = path.join(DB_DIR, 'nav.db');
+const UPLOADS_DIR = path.join(PROJECT_ROOT, 'uploads');
+const TEMP_DIR = path.join(PROJECT_ROOT, 'temp');
+
+if (!fs.existsSync(TEMP_DIR)) {
+  fs.mkdirSync(TEMP_DIR, { recursive: true });
+}
+
+const upload = multer({ dest: TEMP_DIR });
 
 router.get('/export', async (req, res) => {
-  try {
-    const backupName = `backup_${Date.now()}.zip`;
-    const tempPath = path.join(__dirname, `../temp/${backupName}`);
+  const backupName = `backup_${Date.now()}.zip`;
+  const tempZipPath = path.join(TEMP_DIR, backupName);
 
-    const output = fs.createWriteStream(tempPath);
+  try {
+    const output = fs.createWriteStream(tempZipPath);
     const archive = archiver('zip', { zlib: { level: 9 } });
 
     output.on('close', () => {
-      res.download(tempPath, backupName, () => {
-        fs.unlink(tempPath, () => {});
+      res.download(tempZipPath, backupName, (err) => {
+        try {
+          if (fs.existsSync(tempZipPath)) {
+            fs.unlinkSync(tempZipPath);
+          }
+        } catch (e) {
+          console.warn('删除临时备份文件失败:', e);
+        }
+        if (err) {
+          console.error('下载备份文件时出错:', err);
+        }
       });
     });
 
-    archive.on('error', err => {
-      throw err;
+    archive.on('error', (err) => {
+      console.error('打包备份失败:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: '备份失败' });
+      }
     });
 
     archive.pipe(output);
 
-    const dbPath = path.join(__dirname, '../database/nav.db');
-    archive.file(dbPath, { name: 'database/nav.db' });
+    if (!fs.existsSync(DB_FILE)) {
+      console.warn('数据库文件不存在:', DB_FILE);
+    } else {
+      archive.file(DB_FILE, { name: 'database/nav.db' });
+    }
 
-    const uploadsDir = path.join(__dirname, '../uploads');
-    if (fs.existsSync(uploadsDir)) {
-      archive.directory(uploadsDir, 'uploads');
+    if (fs.existsSync(UPLOADS_DIR)) {
+      archive.directory(UPLOADS_DIR, 'uploads');
     }
 
     await archive.finalize();
   } catch (err) {
     console.error('备份失败:', err);
-    res.status(500).json({ error: '备份失败' });
+    try {
+      if (fs.existsSync(tempZipPath)) {
+        fs.unlinkSync(tempZipPath);
+      }
+    } catch (_) {}
+    if (!res.headersSent) {
+      res.status(500).json({ error: '备份失败' });
+    }
   }
 });
 
 router.post('/import', upload.any(), async (req, res) => {
   let extractRoot = null;
+  let uploadedFilePath = null;
 
   try {
     const file = req.files && req.files[0];
@@ -52,31 +85,28 @@ router.post('/import', upload.any(), async (req, res) => {
       return res.status(400).json({ error: '未上传备份文件' });
     }
 
+    uploadedFilePath = file.path;
+
     const ext = path.extname(file.originalname || '');
     if (ext.toLowerCase() !== '.zip') {
-      fs.unlink(file.path, () => {});
+      fs.unlink(uploadedFilePath, () => {});
       return res.status(400).json({ error: '备份文件必须为 .zip 格式' });
     }
 
-    const tempRoot = path.join(__dirname, '../temp');
-    if (!fs.existsSync(tempRoot)) {
-      fs.mkdirSync(tempRoot, { recursive: true });
-    }
-
-    extractRoot = path.join(tempRoot, `import_${Date.now()}`);
+    extractRoot = path.join(TEMP_DIR, `import_${Date.now()}`);
     fs.mkdirSync(extractRoot, { recursive: true });
 
     await fs
-      .createReadStream(file.path)
+      .createReadStream(uploadedFilePath)
       .pipe(unzipper.Extract({ path: extractRoot }))
       .promise();
 
-    fs.unlink(file.path, () => {});
+    fs.unlink(uploadedFilePath, () => {});
 
     const dbInBackup = path.join(extractRoot, 'database', 'nav.db');
     if (!fs.existsSync(dbInBackup) || !fs.statSync(dbInBackup).isFile()) {
       return res.status(400).json({
-        error: '备份文件结构不正确，未在根目录下找到 database/nav.db'
+        error: '备份文件结构不正确'
       });
     }
 
@@ -98,28 +128,29 @@ router.post('/import', upload.any(), async (req, res) => {
       });
     }
 
-    const targetDbDir = path.join(__dirname, '../database');
-    if (!fs.existsSync(targetDbDir)) {
-      fs.mkdirSync(targetDbDir, { recursive: true });
+    if (!fs.existsSync(DB_DIR)) {
+      fs.mkdirSync(DB_DIR, { recursive: true });
     }
-    const targetDbPath = path.join(targetDbDir, 'nav.db');
-    fs.copyFileSync(dbInBackup, targetDbPath);
+
+    fs.copyFileSync(dbInBackup, DB_FILE);
 
     const uploadsInBackup = path.join(extractRoot, 'uploads');
-    const targetUploadsDir = path.join(__dirname, '../uploads');
-
     if (fs.existsSync(uploadsInBackup) && fs.statSync(uploadsInBackup).isDirectory()) {
-      if (fs.existsSync(targetUploadsDir)) {
-        fs.rmSync(targetUploadsDir, { recursive: true, force: true });
+      if (fs.existsSync(UPLOADS_DIR)) {
+        fs.rmSync(UPLOADS_DIR, { recursive: true, force: true });
       }
-      fs.cpSync(uploadsInBackup, targetUploadsDir, { recursive: true });
+      fs.cpSync(uploadsInBackup, UPLOADS_DIR, { recursive: true });
     }
 
-    if (extractRoot && fs.existsSync(extractRoot)) {
-      fs.rmSync(extractRoot, { recursive: true, force: true });
+    try {
+      if (extractRoot && fs.existsSync(extractRoot)) {
+        fs.rmSync(extractRoot, { recursive: true, force: true });
+      }
+    } catch (cleanErr) {
+      console.warn('清理解压目录失败:', cleanErr);
     }
 
-    res.json({ message: '恢复成功' });
+    return res.json({ message: '恢复成功' });
   } catch (err) {
     console.error('恢复失败:', err);
 
@@ -129,7 +160,11 @@ router.post('/import', upload.any(), async (req, res) => {
       }
     } catch (_) {}
 
-    res.status(500).json({ error: '恢复失败' });
+    if (uploadedFilePath && fs.existsSync(uploadedFilePath)) {
+      fs.unlink(uploadedFilePath, () => {});
+    }
+
+    return res.status(500).json({ error: '恢复失败' });
   }
 });
 
