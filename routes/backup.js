@@ -8,7 +8,8 @@ const unzipper = require('unzipper');
 const router = express.Router();
 
 const PROJECT_ROOT = path.join(__dirname, '..');
-const DB_FILE = path.join(__dirname, '../database/nav.db');
+const DB_DIR = path.join(__dirname, '../database');
+const DB_FILE = path.join(DB_DIR, 'nav.db');
 const UPLOADS_DIR = path.join(PROJECT_ROOT, 'uploads');
 const TEMP_DIR = path.join(PROJECT_ROOT, 'temp');
 
@@ -126,9 +127,8 @@ router.post('/import', upload.any(), async (req, res) => {
       });
     }
 
-    const dbDir = path.dirname(DB_FILE);
-    if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir, { recursive: true });
+    if (!fs.existsSync(DB_DIR)) {
+      fs.mkdirSync(DB_DIR, { recursive: true });
     }
     fs.copyFileSync(dbInBackup, DB_FILE);
 
