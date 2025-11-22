@@ -300,11 +300,12 @@ const searchEngines = [
     url: q => `https://www.bing.com/search?q=${encodeURIComponent(q)}`
   },
   {
-    name: 'github',
-    label: 'github',
-    placeholder: 'GitHub 搜索...',
-    url: q => `https://github.com/search?q=${encodeURIComponent(q)}&type=repositories`
-  }
+  name: 'yandex',
+  label: 'Yandex',
+  placeholder: 'Yandex 搜索...',
+  url: q => `https://yandex.com/search/?text=${encodeURIComponent(q)}`
+  },
+
 ];
 
 const selectedEngine = ref(searchEngines[0]);
