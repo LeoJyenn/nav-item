@@ -12,6 +12,8 @@ if (!fs.existsSync(dbDir)) {
 const db = new sqlite3.Database(path.join(dbDir, 'nav.db'));
 
 db.serialize(() => {
+  db.run('PRAGMA foreign_keys = ON');
+
   db.run(`CREATE TABLE IF NOT EXISTS menus (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -101,7 +103,6 @@ db.serialize(() => {
       const stmt = db.prepare('INSERT INTO menus (name, "order") VALUES (?, ?)');
       defaultMenus.forEach(([name, order]) => stmt.run(name, order));
       stmt.finalize(() => {
-        console.log('菜单插入完成，开始插入默认子菜单和卡片...');
         insertDefaultSubMenusAndCards();
       });
     }
@@ -115,14 +116,8 @@ db.serialize(() => {
       }
       
       if (menus && menus.length) {
-        console.log('找到菜单数量:', menus.length);
-        menus.forEach(menu => {
-          console.log(`菜单: ${menu.name} (ID: ${menu.id})`);
-        });
-        
         const menuMap = {};
         menus.forEach(m => { menuMap[m.name] = m.id; });
-        console.log('菜单映射:', menuMap);
         
         const subMenus = [];
         
@@ -133,22 +128,15 @@ db.serialize(() => {
         subMenus.forEach(subMenu => {
           if (menuMap[subMenu.parentMenu]) {
             subMenuStmt.run(menuMap[subMenu.parentMenu], subMenu.name, subMenu.order, function(err) {
-              if (err) {
-                console.error(`插入子菜单失败 [${subMenu.parentMenu}] ${subMenu.name}:`, err);
-              } else {
+              if (!err) {
                 subMenuInsertCount++;
                 subMenuMap[`${subMenu.parentMenu}_${subMenu.name}`] = this.lastID;
-                console.log(`成功插入子菜单 [${subMenu.parentMenu}] ${subMenu.name} (ID: ${this.lastID})`);
               }
             });
-          } else {
-            console.warn(`未找到父菜单: ${subMenu.parentMenu}`);
           }
         });
         
         subMenuStmt.finalize(() => {
-          console.log(`所有子菜单插入完成，总计: ${subMenuInsertCount} 个子菜单`);
-          
           const cards = [
             { menu: 'Home', title: 'Baidu',   url: 'https://www.baidu.com',       logo_url: '', desc: '全球最大的中文搜索引擎'  },
             { menu: 'Home', title: 'Youtube', url: 'https://www.youtube.com',     logo_url: 'https://img.icons8.com/ios-filled/100/ff1d06/youtube-play.png', desc: '全球最大的视频社区'  },
@@ -172,36 +160,22 @@ db.serialize(() => {
               
               if (subMenuId) {
                 cardStmt.run(null, subMenuId, card.title, card.url, card.logo_url, card.desc, function(err) {
-                  if (err) {
-                    console.error(`插入子菜单卡片失败 [${card.subMenu}] ${card.title}:`, err);
-                  } else {
+                  if (!err) {
                     cardInsertCount++;
-                    console.log(`成功插入子菜单卡片 [${card.subMenu}] ${card.title}`);
                   }
                 });
-              } else {
-                console.warn(`未找到子菜单: ${card.subMenu}`);
               }
             } else if (menuMap[card.menu]) {
               cardStmt.run(menuMap[card.menu], null, card.title, card.url, card.logo_url, card.desc, function(err) {
-                if (err) {
-                  console.error(`插入卡片失败 [${card.menu}] ${card.title}:`, err);
-                } else {
+                if (!err) {
                   cardInsertCount++;
-                  console.log(`成功插入卡片 [${card.menu}] ${card.title}`);
                 }
               });
-            } else {
-              console.warn(`未找到菜单: ${card.menu}`);
             }
           });
           
-          cardStmt.finalize(() => {
-            console.log(`所有卡片插入完成，总计: ${cardInsertCount} 张卡片`);
-          });
+          cardStmt.finalize(() => {});
         });
-      } else {
-        console.log('未找到任何菜单');
       }
     });
   }
