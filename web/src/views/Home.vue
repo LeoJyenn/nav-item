@@ -3,10 +3,32 @@
     :class="['home-container', textModeClass, { 'is-dark-overlay': isDarkOverlay }]"
     :style="containerStyles"
     @click="onBlankAreaClick"
+    @dblclick="toggleBgVideoSound"
     @touchstart="onTouchStart"
     @touchmove="onTouchMove"
     @touchend="onTouchEnd"
   >
+    <video
+      v-if="!isMobile && showVideoBgPc"
+      ref="bgVideoPc"
+      class="bg-video-layer"
+      :src="bgPcUrl"
+      autoplay
+      muted
+      loop
+      playsinline
+    ></video>
+    <video
+      v-if="isMobile && showVideoBgMobile"
+      ref="bgVideoMobile"
+      class="bg-video-layer"
+      :src="bgMobileUrl"
+      autoplay
+      muted
+      loop
+      playsinline
+    ></video>
+
     <div class="menu-bar-fixed" ref="menuBarContainer">
       <MenuBar 
         :ref="menuBarRef"
@@ -166,6 +188,9 @@ const isSwiping = ref(false);
 
 const needScrollToTop = ref(false);
 
+const bgVideoPc = ref(null);
+const bgVideoMobile = ref(null);
+
 function applyCustomCode(code) {
   if (typeof window === 'undefined') return;
   const containerId = 'nav-custom-code-container';
@@ -197,6 +222,32 @@ function applyCustomCode(code) {
   });
 }
 
+const getExt = (url) => {
+  if (!url) return '';
+  const clean = url.split('?')[0];
+  const parts = clean.split('.');
+  if (parts.length <= 1) return '';
+  return parts[parts.length - 1].toLowerCase();
+};
+
+const isImageUrl = (url) => {
+  const ext = getExt(url);
+  return ['jpg','jpeg','png','gif','webp','bmp','svg','jfif','heic','cr2','raw']
+    .includes(ext);
+};
+
+const isVideoUrl = (url) => {
+  const ext = getExt(url);
+  return ['mp4','webm','ogg'].includes(ext);
+};
+
+const bgPcUrl = computed(() => settings.value.bg_url_pc || '');
+const bgMobileUrl = computed(() => settings.value.bg_url_mobile || '');
+const hasVideoBgPc = computed(() => isVideoUrl(bgPcUrl.value));
+const hasVideoBgMobile = computed(() => isVideoUrl(bgMobileUrl.value));
+const showVideoBgPc = computed(() => !prefersDark.value && hasVideoBgPc.value);
+const showVideoBgMobile = computed(() => !prefersDark.value && hasVideoBgMobile.value);
+
 const backgroundStyles = computed(() => {
   const isDark = prefersDark.value;
   const styles = {};
@@ -213,16 +264,20 @@ const backgroundStyles = computed(() => {
     styles['--dynamic-overlay-color'] = 'rgba(0, 0, 0, 0)';
     return styles;
   }
-  const pcUrl = settings.value.bg_url_pc;
-  const mobileUrl = settings.value.bg_url_mobile;
+  const pcUrl = bgPcUrl.value;
+  const mobileUrl = bgMobileUrl.value;
   const rawBgOp = parseFloat(settings.value.bg_opacity);
   const opacity = isNaN(rawBgOp) ? 0.15 : rawBgOp; 
   const overlayTint = 1.0 - opacity; 
-  if (pcUrl) {
+  if (pcUrl && isImageUrl(pcUrl)) {
     styles['--dynamic-bg-pc'] = `url(${pcUrl})`;
+  } else {
+    styles['--dynamic-bg-pc'] = '';
   }
-  if (mobileUrl) {
+  if (mobileUrl && isImageUrl(mobileUrl)) {
     styles['--dynamic-bg-mobile'] = `url(${mobileUrl})`;
+  } else {
+    styles['--dynamic-bg-mobile'] = '';
   }
   if (pcUrl || mobileUrl) {
     styles['--dynamic-overlay-color'] = `rgba(0, 0, 0, ${overlayTint})`;
@@ -234,11 +289,11 @@ const backgroundStyles = computed(() => {
 
 const dynamicTextColor = computed(() => {
   const mode = settings.value.text_color_mode || 'auto';
-  const hasBgImage = !!(settings.value.bg_url_pc || settings.value.bg_url_mobile);
+  const hasBg = !!(settings.value.bg_url_pc || settings.value.bg_url_mobile);
   if (prefersDark.value) {
     return '#ffffff';
   }
-  if (!hasBgImage) {
+  if (!hasBg) {
     return '#000000';
   }
   if (mode === 'white') return '#ffffff';
@@ -300,12 +355,11 @@ const searchEngines = [
     url: q => `https://www.bing.com/search?q=${encodeURIComponent(q)}`
   },
   {
-  name: 'yandex',
-  label: 'Yandex',
-  placeholder: 'Yandex 搜索...',
-  url: q => `https://yandex.com/search/?text=${encodeURIComponent(q)}`
-  },
-
+    name: 'yandex',
+    label: 'Yandex',
+    placeholder: 'Yandex 搜索...',
+    url: q => `https://yandex.com/search/?text=${encodeURIComponent(q)}`
+  }
 ];
 
 const selectedEngine = ref(searchEngines[0]);
@@ -569,6 +623,23 @@ function onBlankAreaClick() {
   }
 }
 
+function toggleBgVideoSound() {
+  let v = null;
+  if (!isMobile.value && showVideoBgPc.value) {
+    v = bgVideoPc.value;
+  } else if (isMobile.value && showVideoBgMobile.value) {
+    v = bgVideoMobile.value;
+  }
+  if (!v) return;
+  if (v.muted || v.volume === 0) {
+    v.muted = false;
+    v.volume = 1;
+    v.play().catch(() => {});
+  } else {
+    v.muted = true;
+  }
+}
+
 function handleLogoError(event) {
   event.target.style.display = 'none';
   if (event.target.nextElementSibling) {
@@ -648,6 +719,17 @@ function onTouchEnd() {
 .modal-content,
 .modal-content * {
   color: #000000 !important;
+}
+
+.bg-video-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100lvh;
+  width: 100%;
+  object-fit: cover;
+  z-index: -3;
 }
 
 .home-container::before {
