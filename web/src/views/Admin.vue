@@ -101,9 +101,9 @@
         <li :class="{active: page==='card'}" @click="page='card'; closeSider()">卡片管理</li>
         <li :class="{active: page==='ad'}" @click="page='ad'; closeSider()">广告管理</li>
         <li :class="{active: page==='friend'}" @click="page='friend'; closeSider()">友链管理</li>
-        <li :class="{active: page==='upload'}" @click="page='upload'; closeSider()">图片上传</li>
-        <li :class="{active: page==='settings'}" @click="page='settings'; closeSider()">网站外观设置</li>
-        <li :class="{active: page==='backup'}" @click="page='backup'; closeSider()">数据备份与恢复</li>
+        <li :class="{active: page==='upload'}" @click="page='upload'; closeSider()">文件管理</li>
+        <li :class="{active: page==='settings'}" @click="page='settings'; closeSider()">外观设置</li>
+        <li :class="{active: page==='backup'}" @click="page='backup'; closeSider()">数据备份</li>
         <li :class="{active: page==='user'}" @click="page='user'; closeSider()">用户管理</li>
       </ul>
     </aside>
@@ -166,7 +166,7 @@
         <CardManage v-if="page==='card'" />
         <AdManage v-if="page==='ad'" />
         <FriendLinkManage v-if="page==='friend'" />
-        <ImageUploadManage v-if="page==='upload'" />
+        <FileUploadManage v-if="page==='upload'" />
         <UserManage v-if="page==='user'" />
         <BackupManage v-if="page==='backup'" />
         <SiteSettings v-if="page==='settings'" />
@@ -196,7 +196,7 @@ import FriendLinkManage from './admin/FriendLinkManage.vue'
 import UserManage from './admin/UserManage.vue'
 import BackupManage from './admin/BackupManage.vue'
 import SiteSettings from './admin/SiteSettings.vue'
-import ImageUploadManage from './admin/ImageUploadManage.vue'
+import FileUploadManage from './admin/FileUploadManage.vue'
 
 const page = ref('welcome')
 const lastLoginTime = ref('')
@@ -216,10 +216,10 @@ const pageTitle = computed(() => {
     case 'card': return '卡片管理'
     case 'ad': return '广告管理'
     case 'friend': return '友链管理'
-    case 'upload': return '图片上传管理'
+    case 'upload': return '文件管理'
     case 'user': return '用户管理'
-    case 'backup': return '数据备份与恢复'
-    case 'settings': return '网站外观设置'
+    case 'backup': return '数据备份'
+    case 'settings': return '外观设置'
     default: return ''
   }
 })
