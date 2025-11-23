@@ -17,9 +17,25 @@
           placeholder="备注（可选，用于说明该文件用途）"
           class="input"
         />
-        <button class="btn btn-block" @click="handleUpload">
-          上传文件
+        <button
+          class="btn btn-block"
+          @click="handleUpload"
+          :disabled="uploading"
+        >
+          <span v-if="!uploading">上传文件</span>
+          <span v-else>上传中 {{ uploadProgress }}%</span>
         </button>
+      </div>
+      <div v-if="uploading" class="upload-progress-wrapper">
+        <div class="upload-progress-bar">
+          <div
+            class="upload-progress-inner"
+            :style="{ width: uploadProgress + '%' }"
+          ></div>
+        </div>
+        <div class="upload-progress-text">
+          正在上传文件 {{ uploadProgress }}%
+        </div>
       </div>
     </div>
 
@@ -53,7 +69,9 @@
                 </template>
                 <template v-else>
                   <div class="file-icon-cell">
-                    <span class="file-ext">{{ getExt(img.filename || img.url) }}</span>
+                    <span class="file-ext">{{
+                      getExt(img.filename || img.url)
+                    }}</span>
                   </div>
                 </template>
               </td>
@@ -80,7 +98,14 @@
                       stroke-linecap="round"
                       stroke-linejoin="round"
                     >
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <rect
+                        x="9"
+                        y="9"
+                        width="13"
+                        height="13"
+                        rx="2"
+                        ry="2"
+                      ></rect>
                       <path
                         d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
                       ></path>
@@ -89,7 +114,7 @@
                 </div>
               </td>
               <td>
-                <span class="remark-text">{{ img.remark || '-' }}</span>
+                <span class="remark-text">{{ img.remark || "-" }}</span>
               </td>
               <td>
                 <span class="time-text">{{ formatTime(img.created_at) }}</span>
@@ -145,11 +170,7 @@
       </div>
 
       <div v-else class="upload-list-mobile">
-        <div
-          v-for="img in images"
-          :key="img.id"
-          class="upload-item"
-        >
+        <div v-for="img in images" :key="img.id" class="upload-item">
           <div class="upload-item-header">
             <div class="upload-item-preview">
               <template v-if="isImage(img.filename || img.url)">
@@ -165,7 +186,9 @@
               </template>
               <template v-else>
                 <div class="file-icon-cell-mobile">
-                  <span class="file-ext-mobile">{{ getExt(img.filename || img.url) }}</span>
+                  <span class="file-ext-mobile">{{
+                    getExt(img.filename || img.url)
+                  }}</span>
                 </div>
               </template>
             </div>
@@ -237,7 +260,14 @@
                   stroke-linecap="round"
                   stroke-linejoin="round"
                 >
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <rect
+                    x="9"
+                    y="9"
+                    width="13"
+                    height="13"
+                    rx="2"
+                    ry="2"
+                  ></rect>
                   <path
                     d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
                   ></path>
@@ -248,7 +278,7 @@
 
           <div class="upload-item-row">
             <span class="item-label">备注</span>
-            <span class="item-value">{{ img.remark || '-' }}</span>
+            <span class="item-value">{{ img.remark || "-" }}</span>
           </div>
 
           <div class="upload-item-row">
@@ -266,15 +296,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue';
-import {
-  fileUpload,
-  getUploadImages,
-  deleteUploadImage
-} from '../../api';
+import { ref, onMounted, onBeforeUnmount } from "vue";
+import { fileUpload, getUploadImages, deleteUploadImage } from "../../api";
 
 const files = ref([]);
-const remark = ref('');
+const remark = ref("");
 const images = ref([]);
 const copiedId = ref(null);
 let copiedTimer = null;
@@ -284,7 +310,7 @@ const uploading = ref(false);
 const uploadProgress = ref(0);
 
 const updateIsMobile = () => {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
   isMobile.value = window.innerWidth <= 768;
 };
 
@@ -300,27 +326,52 @@ const loadImages = async () => {
 
 const handleUpload = async () => {
   if (!files.value.length) {
-    alert('请先选择文件');
+    alert("请先选择文件");
     return;
   }
+
   try {
-    for (const f of files.value) {
-      await fileUpload(f, remark.value);
+    uploading.value = true;
+    uploadProgress.value = 0;
+
+    const total = files.value.length;
+
+    for (let i = 0; i < total; i++) {
+      const f = files.value[i];
+
+      await fileUpload(f, remark.value, (e) => {
+        if (!e.lengthComputable) {
+          uploadProgress.value = Math.round((i / total) * 100);
+          return;
+        }
+        const single = e.loaded / e.total;
+        const overall = (i + single) / total;
+        uploadProgress.value = Math.round(overall * 100);
+      });
     }
+
+    uploadProgress.value = 100;
+
     files.value = [];
-    remark.value = '';
-    const fileInput = document.querySelector('.file-input');
-    if (fileInput) fileInput.value = '';
-    loadImages();
+    remark.value = "";
+    const fileInput = document.querySelector(".file-input");
+    if (fileInput) fileInput.value = "";
+
+    await loadImages();
   } catch (e) {
     console.error(e);
-    alert('文件上传失败，请稍后重试');
+    alert("文件上传失败，请稍后重试");
+  } finally {
+    setTimeout(() => {
+      uploading.value = false;
+      uploadProgress.value = 0;
+    }, 500);
   }
 };
 
 const fullUrl = (url) => {
-  if (!url) return '';
-  if (url.startsWith('http')) return url;
+  if (!url) return "";
+  if (url.startsWith("http")) return url;
   return window.location.origin + url;
 };
 
@@ -330,20 +381,20 @@ const copyLink = async (text, id) => {
       await navigator.clipboard.writeText(text);
     } else {
       const scrollY = window.scrollY || window.pageYOffset || 0;
-      const tempInput = document.createElement('textarea');
+      const tempInput = document.createElement("textarea");
       tempInput.value = text;
-      tempInput.setAttribute('readonly', '');
-      tempInput.style.position = 'fixed';
-      tempInput.style.top = '-9999px';
-      tempInput.style.left = '-9999px';
-      tempInput.style.opacity = '0';
-      tempInput.style.pointerEvents = 'none';
+      tempInput.setAttribute("readonly", "");
+      tempInput.style.position = "fixed";
+      tempInput.style.top = "-9999px";
+      tempInput.style.left = "-9999px";
+      tempInput.style.opacity = "0";
+      tempInput.style.pointerEvents = "none";
       document.body.appendChild(tempInput);
       tempInput.select();
       try {
-        document.execCommand('copy');
+        document.execCommand("copy");
       } catch (e) {
-        console.warn('document.execCommand 复制失败', e);
+        console.warn("document.execCommand 复制失败", e);
       }
       if (window.getSelection) {
         const sel = window.getSelection();
@@ -360,13 +411,13 @@ const copyLink = async (text, id) => {
       copiedId.value = null;
     }, 1000);
   } catch (e) {
-    console.warn('复制失败', e);
-    alert('复制失败，请手动复制');
+    console.warn("复制失败", e);
+    alert("复制失败，请手动复制");
   }
 };
 
 const formatTime = (t) => {
-  if (!t) return '';
+  if (!t) return "";
   return String(t);
 };
 
@@ -376,42 +427,54 @@ const deleteImage = async (id) => {
     loadImages();
   } catch (e) {
     console.error(e);
-    alert('删除失败，请稍后重试');
+    alert("删除失败，请稍后重试");
   }
 };
 
 const getExt = (name) => {
-  if (!name) return '';
-  const parts = name.split('?')[0].split('.');
-  if (parts.length <= 1) return '';
+  if (!name) return "";
+  const parts = name.split("?")[0].split(".");
+  if (parts.length <= 1) return "";
   return parts[parts.length - 1].toLowerCase();
 };
 
 const isImage = (name) => {
   const ext = getExt(name);
   if (!ext) return false;
-  const list = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'jfif', 'heic', 'cr2', 'raw'];
+  const list = [
+    "jpg",
+    "jpeg",
+    "png",
+    "gif",
+    "webp",
+    "bmp",
+    "svg",
+    "jfif",
+    "heic",
+    "cr2",
+    "raw"
+  ];
   return list.includes(ext);
 };
 
 const isVideo = (name) => {
   const ext = getExt(name);
   if (!ext) return false;
-  const list = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'];
+  const list = ["mp4", "webm", "ogg", "mov", "avi", "mkv"];
   return list.includes(ext);
 };
 
 onMounted(() => {
   updateIsMobile();
-  if (typeof window !== 'undefined') {
-    window.addEventListener('resize', updateIsMobile);
+  if (typeof window !== "undefined") {
+    window.addEventListener("resize", updateIsMobile);
   }
   loadImages();
 });
 
 onBeforeUnmount(() => {
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('resize', updateIsMobile);
+  if (typeof window !== "undefined") {
+    window.removeEventListener("resize", updateIsMobile);
   }
 });
 </script>
@@ -457,6 +520,31 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
 }
 
+.upload-progress-wrapper {
+  margin-top: 8px;
+}
+
+.upload-progress-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+  overflow: hidden;
+}
+
+.upload-progress-inner {
+  height: 100%;
+  border-radius: 999px;
+  background: #22c55e;
+  transition: width 0.2s ease;
+}
+
+.upload-progress-text {
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
 .input {
   padding: 8px 10px;
   border-radius: 8px;
@@ -497,6 +585,11 @@ onBeforeUnmount(() => {
   gap: 6px;
   height: 36px;
   box-sizing: border-box;
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .btn-block {
@@ -702,13 +795,6 @@ onBeforeUnmount(() => {
   font-size: 0.9rem;
 }
 
-.td-actions {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
 .upload-list-mobile {
   width: 100%;
   box-sizing: border-box;
@@ -868,4 +954,3 @@ onBeforeUnmount(() => {
   }
 }
 </style>
-
