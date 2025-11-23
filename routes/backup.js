@@ -7,6 +7,17 @@ const archiver = require('archiver');
 const unzipper = require('unzipper');
 const sqlite3 = require('sqlite3').verbose();
 
+const dataRoot = path.join(__dirname, '../data');
+if (!fs.existsSync(dataRoot)) fs.mkdirSync(dataRoot, { recursive: true });
+
+const dbDir = path.join(dataRoot, 'database');
+if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+
+const uploadsDir = path.join(dataRoot, 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+const dbPath = path.join(dbDir, 'nav.db');
+
 const upload = multer({ dest: path.join(__dirname, '../temp') });
 
 function copyDirSync(src, dest) {
@@ -48,9 +59,9 @@ function clearDirSync(dir) {
 router.get('/export', async (req, res) => {
   try {
     const backupName = `backup_${Date.now()}.zip`;
-    const tempPath = path.join(__dirname, `../temp/${backupName}`);
-
     const tempDir = path.join(__dirname, '../temp');
+    const tempPath = path.join(tempDir, backupName);
+
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
     const output = fs.createWriteStream(tempPath);
@@ -66,7 +77,6 @@ router.get('/export', async (req, res) => {
 
     archive.pipe(output);
 
-    const dbPath = path.join(__dirname, '../database/nav.db');
     if (fs.existsSync(dbPath)) {
       const safeDbPath = path.join(tempDir, `nav_safe_${Date.now()}.db`);
       fs.copyFileSync(dbPath, safeDbPath);
@@ -94,7 +104,6 @@ router.get('/export', async (req, res) => {
       archive.file(safeDbPath, { name: 'database/nav.db' });
     }
 
-    const uploadsDir = path.join(__dirname, '../uploads');
     if (fs.existsSync(uploadsDir)) {
       archive.directory(uploadsDir, 'uploads');
     }
@@ -138,9 +147,9 @@ router.post('/import', upload.any(), async (req, res) => {
       return res.status(400).json({ error: `恢复失败，缺少：${missing.join('、')}` });
     }
 
-    const targetDbDir = path.join(__dirname, '../database');
-    const targetUploadsDir = path.join(__dirname, '../uploads');
-    const targetDbPath = path.join(targetDbDir, 'nav.db');
+    const targetDbDir = dbDir;
+    const targetUploadsDir = uploadsDir;
+    const targetDbPath = dbPath;
 
     if (!fs.existsSync(targetDbDir)) fs.mkdirSync(targetDbDir, { recursive: true });
     if (!fs.existsSync(targetUploadsDir)) fs.mkdirSync(targetUploadsDir, { recursive: true });
