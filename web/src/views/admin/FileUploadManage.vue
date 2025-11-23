@@ -2,7 +2,7 @@
   <div class="upload-manage">
     <div class="upload-header">
       <div class="header-content">
-        <h2 class="page-title">文件上传管理</h2>
+        <h2 class="page-title">文件管理</h2>
       </div>
       <div class="upload-add">
         <input
@@ -868,3 +868,4 @@ onBeforeUnmount(() => {
   }
 }
 </style>
+
