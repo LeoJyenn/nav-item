@@ -4,12 +4,18 @@ const path = require('path');
 const bcrypt = require('bcrypt');
 const config = require('./config');
 
-const dbDir = path.join(__dirname, 'database');
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir);
+const dataRoot = path.join(__dirname, 'data');
+if (!fs.existsSync(dataRoot)) {
+  fs.mkdirSync(dataRoot, { recursive: true });
 }
 
-const db = new sqlite3.Database(path.join(dbDir, 'nav.db'));
+const dbDir = path.join(dataRoot, 'database');
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
+const dbPath = path.join(dbDir, 'nav.db');
+const db = new sqlite3.Database(dbPath);
 
 db.serialize(() => {
   db.run('PRAGMA foreign_keys = ON');
@@ -20,7 +26,7 @@ db.serialize(() => {
     "order" INTEGER DEFAULT 0
   )`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_menus_order ON menus("order")`);
-  
+
   db.run(`CREATE TABLE IF NOT EXISTS sub_menus (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     parent_id INTEGER NOT NULL,
@@ -30,7 +36,7 @@ db.serialize(() => {
   )`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_sub_menus_parent_id ON sub_menus(parent_id)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_sub_menus_order ON sub_menus("order")`);
-  
+
   db.run(`CREATE TABLE IF NOT EXISTS cards (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     menu_id INTEGER,
@@ -47,14 +53,14 @@ db.serialize(() => {
   db.run(`CREATE INDEX IF NOT EXISTS idx_cards_menu_id ON cards(menu_id)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_cards_sub_menu_id ON cards(sub_menu_id)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_cards_order ON cards("order")`);
-  
+
   db.run(`CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL
   )`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`);
-  
+
   db.run(`CREATE TABLE IF NOT EXISTS ads (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     position TEXT NOT NULL,
@@ -62,7 +68,7 @@ db.serialize(() => {
     url TEXT NOT NULL
   )`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_ads_position ON ads(position)`);
-  
+
   db.run(`CREATE TABLE IF NOT EXISTS friends (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
@@ -75,7 +81,7 @@ db.serialize(() => {
     key TEXT PRIMARY KEY NOT NULL,
     value TEXT
   )`);
-  
+
   db.run(`
   CREATE TABLE IF NOT EXISTS uploads (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -114,17 +120,17 @@ db.serialize(() => {
         console.error('获取菜单失败:', err);
         return;
       }
-      
+
       if (menus && menus.length) {
         const menuMap = {};
         menus.forEach(m => { menuMap[m.name] = m.id; });
-        
+
         const subMenus = [];
-        
+
         const subMenuStmt = db.prepare('INSERT INTO sub_menus (parent_id, name, "order") VALUES (?, ?, ?)');
         let subMenuInsertCount = 0;
         const subMenuMap = {};
-        
+
         subMenus.forEach(subMenu => {
           if (menuMap[subMenu.parentMenu]) {
             subMenuStmt.run(menuMap[subMenu.parentMenu], subMenu.name, subMenu.order, function(err) {
@@ -135,7 +141,7 @@ db.serialize(() => {
             });
           }
         });
-        
+
         subMenuStmt.finalize(() => {
           const cards = [
             { menu: 'Home', title: 'Baidu',   url: 'https://www.baidu.com',       logo_url: '', desc: '全球最大的中文搜索引擎'  },
@@ -144,10 +150,10 @@ db.serialize(() => {
             { menu: 'Home', title: 'GitHub',  url: 'https://github.com',          logo_url: '', desc: '全球最大的代码托管平台'  },
             { menu: 'Home', title: 'ChatGPT', url: 'https://chat.openai.com',     logo_url: 'https://cdn.oaistatic.com/assets/favicon-eex17e9e.ico', desc: '人工智能AI聊天机器人'  },
           ];
-          
+
           const cardStmt = db.prepare('INSERT INTO cards (menu_id, sub_menu_id, title, url, logo_url, desc) VALUES (?, ?, ?, ?, ?, ?)');
           let cardInsertCount = 0;
-          
+
           cards.forEach(card => {
             if (card.subMenu) {
               let subMenuId = null;
@@ -157,7 +163,7 @@ db.serialize(() => {
                   break;
                 }
               }
-              
+
               if (subMenuId) {
                 cardStmt.run(null, subMenuId, card.title, card.url, card.logo_url, card.desc, function(err) {
                   if (!err) {
@@ -173,7 +179,7 @@ db.serialize(() => {
               });
             }
           });
-          
+
           cardStmt.finalize(() => {});
         });
       }
