@@ -175,18 +175,21 @@ export const changePassword = (oldPassword, newPassword) =>
 export const getUsers = () =>
   axios.get(`${BASE}/users`, { headers: authHeaders() });
 
-export const exportBackup = () => {
+export const exportBackup = (onDownloadProgress) => {
   return axios.get(`${BASE}/backup/export`, {
     headers: authHeaders(),
-    responseType: 'blob'
+    responseType: 'blob',
+    onDownloadProgress
   });
 };
-export const importBackup = (formData) => {
+
+export const importBackup = (formData, onUploadProgress) => {
   return axios.post(`${BASE}/backup/import`, formData, {
     headers: {
       ...authHeaders(),
       'Content-Type': 'multipart/form-data'
-    }
+    },
+    onUploadProgress
   });
 };
 
