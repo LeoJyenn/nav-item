@@ -85,7 +85,7 @@
       </a>
     </div>
     
-    <CardGrid :cards="cards" @click.stop /> 
+    <CardGrid :cards="cards" :enableAnimation="shouldAnimateCards" @click.stop /> 
     
     <footer class="footer">
       <div class="footer-content">
@@ -161,10 +161,18 @@ const showFriendLinks = ref(false);
 const friendLinks = ref([]);
 const isGlobalSearchActive = ref(false);
 let debounceTimer = null;
+const shouldAnimateCards = ref(true);
 
 const menuBarRef = ref(null);
 const menuBarContainer = ref(null);
-const cardsCache = new Map();
+const menuCache = new Map();
+const searchCache = new Map();
+const prefetchInFlight = new Set();
+const MENU_CACHE_LIMIT = 10;
+const SEARCH_CACHE_LIMIT = 5;
+const SEARCH_DEBOUNCE_MS = 180;
+const CACHE_TTL_MS = 10 * 60 * 1000;
+const PREFETCH_BATCH_LIMIT = 3;
 
 const isMobile = ref(false);
 const menuBarHeight = ref(0);
@@ -329,6 +337,7 @@ const searchSectionStyle = computed(() => {
   };
 });
 
+
 const searchEngines = [
   {
     name: 'site',
@@ -367,6 +376,53 @@ const selectedEngine = ref(searchEngines[0]);
 function selectEngine(engine) {
   selectedEngine.value = engine;
 }
+
+function runWhenIdle(callback) {
+  if (typeof window === 'undefined') {
+    callback();
+    return;
+  }
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(() => callback(), { timeout: 600 });
+  } else {
+    setTimeout(callback, 0);
+  }
+}
+
+function getCache(map, key) {
+  if (!map.has(key)) return null;
+  const entry = map.get(key);
+  if (!entry || typeof entry !== 'object' || entry.ts === undefined) {
+    map.delete(key);
+    return null;
+  }
+  if (Date.now() - entry.ts > CACHE_TTL_MS) {
+    map.delete(key);
+    return null;
+  }
+  map.delete(key);
+  map.set(key, entry);
+  return entry.data;
+}
+
+function setCache(map, key, value, limit) {
+  const entry = {
+    data: value,
+    ts: Date.now()
+  };
+  if (map.has(key)) map.delete(key);
+  map.set(key, entry);
+  while (map.size > limit) {
+    const firstKey = map.keys().next().value;
+    map.delete(firstKey);
+  }
+}
+
+function getMenuCacheKey(menuId, subMenuId) {
+  if (subMenuId) return `submenu-${subMenuId}`;
+  return `menu-${menuId}`;
+}
+
 
 function clearSearch() {
   searchQuery.value = '';
@@ -449,6 +505,7 @@ onMounted(async () => {
       colorSchemeMedia.addListener(handleSchemeChange);
     }
     colorSchemeMedia._handler = handleSchemeChange;
+
   }
 
   isMobile.value = typeof window !== 'undefined' ? window.innerWidth <= 768 : false;
@@ -456,8 +513,15 @@ onMounted(async () => {
     window.addEventListener('resize', handleResize);
   }
 
-  getSettings().then(res => {
-    const data = res.data || {};
+  const [settingsRes, menusRes, adsRes, friendsRes] = await Promise.allSettled([
+    getSettings(),
+    getMenus(),
+    getAds(),
+    getFriends()
+  ]);
+
+  if (settingsRes.status === 'fulfilled') {
+    const data = settingsRes.value.data || {};
     settings.value = {
       ...settings.value,
       ...data
@@ -465,29 +529,32 @@ onMounted(async () => {
     if (!settings.value.custom_code && data.custom_css) {
       settings.value.custom_code = data.custom_css || '';
     }
-  }).catch(err => {
-    console.error("加载网站设置失败:", err);
-  });
-  
-  getMenus().then(async res => {
-    menus.value = res.data;
+  } else {
+    console.error("加载网站设置失败:", settingsRes.reason);
+  }
+
+  if (menusRes.status === 'fulfilled') {
+    menus.value = menusRes.value.data;
     await nextTick();
     measureMenuBar();
     if (menus.value.length) {
       activeMenu.value = menus.value[0];
       needScrollToTop.value = false;
+      shouldAnimateCards.value = true;
       loadCards();
     }
-  });
+  } else {
+    console.error("加载菜单失败:", menusRes.reason);
+  }
 
-  getAds().then(adRes => {
-    leftAds.value = adRes.data.filter(ad => ad.position === 'left');
-    rightAds.value = adRes.data.filter(ad => ad.position === 'right');
-  });
-  
-  getFriends().then(friendRes => {
-    friendLinks.value = friendRes.data;
-  });
+  if (adsRes.status === 'fulfilled') {
+    leftAds.value = adsRes.value.data.filter(ad => ad.position === 'left');
+    rightAds.value = adsRes.value.data.filter(ad => ad.position === 'right');
+  }
+
+  if (friendsRes.status === 'fulfilled') {
+    friendLinks.value = friendsRes.value.data;
+  }
 });
 
 onBeforeUnmount(() => {
@@ -524,6 +591,7 @@ watch(
 async function selectMenu(menu, parentMenu = null) {
   searchQuery.value = '';
   isGlobalSearchActive.value = false;
+  shouldAnimateCards.value = true;
   if (parentMenu) {
     activeMenu.value = parentMenu;
     activeSubMenu.value = menu;
@@ -537,9 +605,7 @@ async function selectMenu(menu, parentMenu = null) {
 
 async function loadCards() {
   if (!activeMenu.value) return;
-  const cacheKey = activeSubMenu.value 
-    ? `submenu-${activeSubMenu.value.id}` 
-    : `menu-${activeMenu.value.id}`;
+  const cacheKey = getMenuCacheKey(activeMenu.value.id, activeSubMenu.value?.id);
 
   const applyCards = async (list) => {
     cards.value = list || [];
@@ -550,14 +616,17 @@ async function loadCards() {
     }
   };
 
-  if (cardsCache.has(cacheKey)) {
-    await applyCards(cardsCache.get(cacheKey));
+  const cached = getCache(menuCache, cacheKey);
+  if (cached) {
+    await applyCards(cached);
+    prefetchAdjacentMenus();
     return; 
   }
   try {
     const res = await getCards(activeMenu.value.id, activeSubMenu.value?.id);
-    cardsCache.set(cacheKey, res.data);
+    setCache(menuCache, cacheKey, res.data, MENU_CACHE_LIMIT);
     await applyCards(res.data);
+    prefetchAdjacentMenus();
   } catch (error) {
     console.error("加载卡片失败:", error);
     await applyCards([]);
@@ -573,37 +642,43 @@ function onSearchInput() {
       } else {
         handleSearch(true); 
       }
-    }, 300); 
+    }, SEARCH_DEBOUNCE_MS); 
   }
 }
 
 async function handleSearch(isRealtime = false) {
   clearTimeout(debounceTimer);
   if (selectedEngine.value.name === 'site') {
+    shouldAnimateCards.value = false;
     const query = searchQuery.value.trim();
     if (!query) {
       clearSearch();
       return;
     }
-    const cacheKey = `search-${query}`;
-    if (cardsCache.has(cacheKey)) {
-      cards.value = cardsCache.get(cacheKey);
-      isGlobalSearchActive.value = true;
-      activeMenu.value = null; 
-      activeSubMenu.value = null;
-      await nextTick();
-      scrollToTop();
+    const cacheKey = query.toLowerCase();
+    const cached = getCache(searchCache, cacheKey);
+    if (cached) {
+      runWhenIdle(async () => {
+        cards.value = cached;
+        isGlobalSearchActive.value = true;
+        activeMenu.value = null; 
+        activeSubMenu.value = null;
+        await nextTick();
+        scrollToTop();
+      });
       return; 
     }
     try {
       const res = await globalSearchCards(query);
-      cards.value = res.data;
-      cardsCache.set(cacheKey, res.data);
-      isGlobalSearchActive.value = true;
-      activeMenu.value = null; 
-      activeSubMenu.value = null;
-      await nextTick();
-      scrollToTop();
+      setCache(searchCache, cacheKey, res.data, SEARCH_CACHE_LIMIT);
+      runWhenIdle(async () => {
+        cards.value = res.data;
+        isGlobalSearchActive.value = true;
+        activeMenu.value = null; 
+        activeSubMenu.value = null;
+        await nextTick();
+        scrollToTop();
+      });
     } catch (error) {
       console.error("全局搜索失败:", error);
       if (!isRealtime) {
@@ -638,6 +713,64 @@ function toggleBgVideoSound() {
   } else {
     v.muted = true;
   }
+}
+
+function prefetchAdjacentMenus() {
+  if (typeof window === 'undefined') return;
+  if (isGlobalSearchActive.value) return;
+  if (!menus.value.length || !activeMenu.value) return;
+
+  const currentIndex = menus.value.findIndex(item => item.id === activeMenu.value.id);
+  if (currentIndex < 0) return;
+
+  const targets = new Map();
+
+  const adjacent = [
+    menus.value[currentIndex - 1],
+    menus.value[currentIndex + 1]
+  ].filter(Boolean);
+
+  adjacent.forEach(menu => {
+    const key = getMenuCacheKey(menu.id);
+    targets.set(key, { menuId: menu.id });
+  });
+
+  menus.value
+    .filter(menu => menu.id !== activeMenu.value.id)
+    .slice(0, PREFETCH_BATCH_LIMIT)
+    .forEach(menu => {
+      const key = getMenuCacheKey(menu.id);
+      targets.set(key, { menuId: menu.id });
+    });
+
+  if (activeMenu.value.subMenus && activeMenu.value.subMenus.length) {
+    activeMenu.value.subMenus
+      .slice(0, PREFETCH_BATCH_LIMIT)
+      .forEach(subMenu => {
+        const key = getMenuCacheKey(activeMenu.value.id, subMenu.id);
+        targets.set(key, { menuId: activeMenu.value.id, subMenuId: subMenu.id });
+      });
+  }
+
+  targets.forEach((target, key) => {
+    if (getCache(menuCache, key) || prefetchInFlight.has(key)) return;
+    prefetchInFlight.add(key);
+    const runPrefetch = () => {
+      getCards(target.menuId, target.subMenuId)
+        .then(res => {
+          setCache(menuCache, key, res.data, MENU_CACHE_LIMIT);
+        })
+        .catch(() => {})
+        .finally(() => {
+          prefetchInFlight.delete(key);
+        });
+    };
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(runPrefetch, { timeout: 1200 });
+    } else {
+      setTimeout(runPrefetch, 150);
+    }
+  });
 }
 
 function handleLogoError(event) {
@@ -1179,6 +1312,7 @@ function onTouchEnd() {
 .home-container.is-dark-overlay .search-input::placeholder {
   color: rgba(255, 255, 255, 0.65) !important;
 }
+
 
 .home-container.is-dark-overlay :deep(.sub-menu),
 .home-container.is-dark-overlay :deep(.sub-menu-item) {

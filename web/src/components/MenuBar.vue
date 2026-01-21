@@ -4,7 +4,6 @@
       v-for="menu in menus" 
       :key="menu.id" 
       class="menu-item"
-      @mouseenter="showSubMenu(menu.id)"
       @mouseleave="hideSubMenu(menu.id)"
     >
       <button 
@@ -209,7 +208,7 @@ defineExpose({
   }
   
   .menu-bar button {
-    font-size: 14px;
+    font-size: 15px;
     padding: .4rem .8rem;
   }
   
