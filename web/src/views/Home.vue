@@ -186,6 +186,10 @@ const settings = ref({
   custom_code: ''
 });
 
+const glassColorRgb = ref('255, 255, 255');
+let colorSampleId = 0;
+const isStandalone = ref(false);
+
 const prefersDark = ref(false);
 let colorSchemeMedia = null;
 
@@ -249,6 +253,208 @@ const isVideoUrl = (url) => {
   return ['mp4','webm','ogg'].includes(ext);
 };
 
+const DEFAULT_GLASS_COLOR = { r: 255, g: 255, b: 255 };
+const GLASS_SOFTEN_AMOUNT = 0.2;
+const STANDALONE_MIN_LUMINANCE = 0.62;
+
+function clampChannel(value) {
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function normalizeRgb(color) {
+  return {
+    r: clampChannel(color.r),
+    g: clampChannel(color.g),
+    b: clampChannel(color.b)
+  };
+}
+
+function rgbToString(color) {
+  const rgb = normalizeRgb(color);
+  return `${rgb.r}, ${rgb.g}, ${rgb.b}`;
+}
+
+function rgbToHex(color) {
+  const rgb = normalizeRgb(color);
+  const toHex = (value) => value.toString(16).padStart(2, '0');
+  return `#${toHex(rgb.r)}${toHex(rgb.g)}${toHex(rgb.b)}`;
+}
+
+function blendColors(base, target, amount) {
+  return {
+    r: base.r + (target.r - base.r) * amount,
+    g: base.g + (target.g - base.g) * amount,
+    b: base.b + (target.b - base.b) * amount
+  };
+}
+
+function getLuminance(color) {
+  return (0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b) / 255;
+}
+
+function softenColor(color) {
+  return blendColors(color, DEFAULT_GLASS_COLOR, GLASS_SOFTEN_AMOUNT);
+}
+
+function adjustForStandalone(color) {
+  if (!isStandalone.value || prefersDark.value) return color;
+  const luminance = getLuminance(color);
+  if (luminance >= STANDALONE_MIN_LUMINANCE) return color;
+  const liftAmount = (STANDALONE_MIN_LUMINANCE - luminance) / STANDALONE_MIN_LUMINANCE;
+  return blendColors(color, DEFAULT_GLASS_COLOR, Math.min(0.6, liftAmount));
+}
+
+function setThemeColorMeta(hexColor) {
+  if (typeof document === 'undefined') return;
+  const metas = document.querySelectorAll('meta[name="theme-color"]');
+  if (!metas.length) {
+    const meta = document.createElement('meta');
+    meta.setAttribute('name', 'theme-color');
+    meta.setAttribute('content', hexColor);
+    document.head.appendChild(meta);
+    return;
+  }
+  metas.forEach(meta => {
+    const media = meta.getAttribute('media') || '';
+    if (media.includes('prefers-color-scheme: dark')) {
+      meta.setAttribute('content', '#000000');
+    } else {
+      meta.setAttribute('content', hexColor);
+    }
+  });
+}
+
+function applyGlassColor(color) {
+  const softened = softenColor(color);
+  const tuned = adjustForStandalone(softened);
+  glassColorRgb.value = rgbToString(tuned);
+  setThemeColorMeta(rgbToHex(tuned));
+}
+
+function sampleAverageColorFromMedia(media) {
+  const canvas = document.createElement('canvas');
+  const sampleWidth = 24;
+  const sampleHeight = 8;
+  canvas.width = sampleWidth;
+  canvas.height = sampleHeight;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+  const sourceWidth = media.videoWidth || media.naturalWidth || media.width || 0;
+  const sourceHeight = media.videoHeight || media.naturalHeight || media.height || 0;
+  if (!sourceWidth || !sourceHeight) return null;
+  ctx.drawImage(media, 0, 0, sourceWidth, sourceHeight, 0, 0, sampleWidth, sampleHeight);
+  const data = ctx.getImageData(0, 0, sampleWidth, sampleHeight).data;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  const total = data.length / 4;
+  for (let i = 0; i < data.length; i += 4) {
+    r += data[i];
+    g += data[i + 1];
+    b += data[i + 2];
+  }
+  return {
+    r: r / total,
+    g: g / total,
+    b: b / total
+  };
+}
+
+function sampleAverageColorFromImage(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const color = sampleAverageColorFromMedia(img);
+        if (color) resolve(color);
+        else reject(new Error('Canvas not available'));
+      } catch (error) {
+        reject(error);
+      }
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+function sampleAverageColorFromVideo(videoEl) {
+  if (!videoEl || videoEl.readyState < 2) return null;
+  try {
+    return sampleAverageColorFromMedia(videoEl);
+  } catch (error) {
+    return null;
+  }
+}
+
+function getPreferredBackgroundUrl() {
+  if (isMobile.value) {
+    return bgMobileUrl.value || bgPcUrl.value || '';
+  }
+  return bgPcUrl.value || bgMobileUrl.value || '';
+}
+
+function resetGlassColor() {
+  const softened = softenColor(DEFAULT_GLASS_COLOR);
+  const tuned = adjustForStandalone(softened);
+  glassColorRgb.value = rgbToString(tuned);
+  setThemeColorMeta(rgbToHex(tuned));
+}
+
+async function updateGlassColor() {
+  if (typeof window === 'undefined') return;
+  if (prefersDark.value) {
+    const softened = softenColor(DEFAULT_GLASS_COLOR);
+    glassColorRgb.value = rgbToString(softened);
+    setThemeColorMeta('#000000');
+    return;
+  }
+
+  const source = getPreferredBackgroundUrl();
+  if (!source) {
+    resetGlassColor();
+    return;
+  }
+
+  const sampleToken = ++colorSampleId;
+
+  if (isVideoUrl(source)) {
+    const videoEl = isMobile.value ? bgVideoMobile.value : bgVideoPc.value;
+    if (!videoEl) {
+      nextTick(() => {
+        if (sampleToken !== colorSampleId) return;
+        const nextVideoEl = isMobile.value ? bgVideoMobile.value : bgVideoPc.value;
+        const nextColor = sampleAverageColorFromVideo(nextVideoEl);
+        if (nextColor) applyGlassColor(nextColor);
+      });
+      return;
+    }
+    const color = sampleAverageColorFromVideo(videoEl);
+    if (color) {
+      applyGlassColor(color);
+      return;
+    }
+    if (videoEl) {
+      const handleLoaded = () => {
+        if (sampleToken !== colorSampleId) return;
+        const nextColor = sampleAverageColorFromVideo(videoEl);
+        if (nextColor) applyGlassColor(nextColor);
+      };
+      videoEl.addEventListener('loadeddata', handleLoaded, { once: true });
+    }
+    return;
+  }
+
+  try {
+    const color = await sampleAverageColorFromImage(source);
+    if (sampleToken !== colorSampleId) return;
+    applyGlassColor(color);
+  } catch (error) {
+    if (sampleToken !== colorSampleId) return;
+    resetGlassColor();
+  }
+}
+
 const bgPcUrl = computed(() => settings.value.bg_url_pc || '');
 const bgMobileUrl = computed(() => settings.value.bg_url_mobile || '');
 const hasVideoBgPc = computed(() => isVideoUrl(bgPcUrl.value));
@@ -262,7 +468,7 @@ const backgroundStyles = computed(() => {
   const rawGlass = settings.value.glass_opacity;
   const rawGlassOp = parseFloat(rawGlass);
   const glassOpacity = isNaN(rawGlassOp) ? 0.7 : rawGlassOp;
-  styles['--glass-color-rgb'] = '255, 255, 255'; 
+  styles['--glass-color-rgb'] = glassColorRgb.value; 
   styles['--glass-opacity'] = glassOpacity;
   const hoverOpacity = Math.min(glassOpacity + 0.15, 1.0);
   styles['--glass-opacity-hover'] = hoverOpacity;
@@ -508,6 +714,22 @@ onMounted(async () => {
 
   }
 
+  if (typeof window !== 'undefined') {
+    const standaloneMedia = window.matchMedia('(display-mode: standalone)');
+    isStandalone.value = standaloneMedia.matches || window.navigator.standalone === true;
+    if (standaloneMedia.addEventListener) {
+      standaloneMedia.addEventListener('change', (event) => {
+        isStandalone.value = event.matches || window.navigator.standalone === true;
+        updateGlassColor();
+      });
+    } else if (standaloneMedia.addListener) {
+      standaloneMedia.addListener((event) => {
+        isStandalone.value = event.matches || window.navigator.standalone === true;
+        updateGlassColor();
+      });
+    }
+  }
+
   isMobile.value = typeof window !== 'undefined' ? window.innerWidth <= 768 : false;
   if (typeof window !== 'undefined') {
     window.addEventListener('resize', handleResize);
@@ -584,6 +806,22 @@ watch(
   () => settings.value.custom_code,
   (newCode) => {
     applyCustomCode(newCode || '');
+  },
+  { immediate: true }
+);
+
+watch(
+  () => [
+    bgPcUrl.value,
+    bgMobileUrl.value,
+    isMobile.value,
+    showVideoBgPc.value,
+    showVideoBgMobile.value,
+    prefersDark.value,
+    isStandalone.value
+  ],
+  () => {
+    updateGlassColor();
   },
   { immediate: true }
 );

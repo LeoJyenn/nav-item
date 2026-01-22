@@ -115,8 +115,10 @@ defineExpose({
   bottom: 0;
   left: 50%;
   width: 60%;
-  height: 2px;
-  background: #399dff;
+  height: 3px;
+  background: #ffffff;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
   /* 优化：使用 transform 替代 width 动画 */
   transition: transform 0.3s ease;
   transform: translateX(-50%) scaleX(0); 
