@@ -39,7 +39,7 @@
       />
     </div>
     
-    <div class="search-section" :style="searchSectionStyle">
+    <div class="search-section" :style="searchSectionStyle" ref="searchSectionRef">
       <div class="search-box-wrapper">
         <div class="search-engine-select">
           <button v-for="engine in searchEngines" :key="engine.name"
@@ -165,6 +165,7 @@ const shouldAnimateCards = ref(true);
 
 const menuBarRef = ref(null);
 const menuBarContainer = ref(null);
+const searchSectionRef = ref(null);
 const menuCache = new Map();
 const searchCache = new Map();
 const prefetchInFlight = new Set();
@@ -180,15 +181,13 @@ const menuBarHeight = ref(0);
 const settings = ref({
   bg_url_pc: '',
   bg_url_mobile: '',
-  bg_opacity: '1',
+  bg_opacity: '0.3',
   glass_opacity: '1', 
   text_color_mode: 'auto',
   custom_code: ''
 });
 
 const glassColorRgb = ref('255, 255, 255');
-let colorSampleId = 0;
-const isStandalone = ref(false);
 
 const prefersDark = ref(false);
 let colorSchemeMedia = null;
@@ -197,6 +196,7 @@ const touchStartX = ref(0);
 const touchStartY = ref(0);
 const touchDeltaX = ref(0);
 const isSwiping = ref(false);
+const isTouchFromHeader = ref(false);
 
 const needScrollToTop = ref(false);
 
@@ -253,207 +253,31 @@ const isVideoUrl = (url) => {
   return ['mp4','webm','ogg'].includes(ext);
 };
 
-const DEFAULT_GLASS_COLOR = { r: 255, g: 255, b: 255 };
-const GLASS_SOFTEN_AMOUNT = 0.2;
-const STANDALONE_MIN_LUMINANCE = 0.62;
+const GLASS_CARD_BLUR_MAX = 10;
+const GLASS_MENU_BLUR_MAX = 12;
+const GLASS_ALPHA_FIXED = 0;
+const GLASS_ALPHA_HOVER = 0;
+const GLASS_FALLBACK_ALPHA_MIN = 0.35;
+const GLASS_FALLBACK_ALPHA_HOVER = 0.45;
+const GLASS_SOFT_START = 0.04;
+const GLASS_SOFT_VALUE = 0.12;
+const GLASS_EASE_POWER = 1;
 
-function clampChannel(value) {
-  return Math.max(0, Math.min(255, Math.round(value)));
+function clamp01(value) {
+  if (Number.isNaN(value)) return 0;
+  return Math.max(0, Math.min(1, value));
 }
 
-function normalizeRgb(color) {
-  return {
-    r: clampChannel(color.r),
-    g: clampChannel(color.g),
-    b: clampChannel(color.b)
-  };
-}
-
-function rgbToString(color) {
-  const rgb = normalizeRgb(color);
-  return `${rgb.r}, ${rgb.g}, ${rgb.b}`;
-}
-
-function rgbToHex(color) {
-  const rgb = normalizeRgb(color);
-  const toHex = (value) => value.toString(16).padStart(2, '0');
-  return `#${toHex(rgb.r)}${toHex(rgb.g)}${toHex(rgb.b)}`;
-}
-
-function blendColors(base, target, amount) {
-  return {
-    r: base.r + (target.r - base.r) * amount,
-    g: base.g + (target.g - base.g) * amount,
-    b: base.b + (target.b - base.b) * amount
-  };
-}
-
-function getLuminance(color) {
-  return (0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b) / 255;
-}
-
-function softenColor(color) {
-  return blendColors(color, DEFAULT_GLASS_COLOR, GLASS_SOFTEN_AMOUNT);
-}
-
-function adjustForStandalone(color) {
-  if (!isStandalone.value || prefersDark.value) return color;
-  const luminance = getLuminance(color);
-  if (luminance >= STANDALONE_MIN_LUMINANCE) return color;
-  const liftAmount = (STANDALONE_MIN_LUMINANCE - luminance) / STANDALONE_MIN_LUMINANCE;
-  return blendColors(color, DEFAULT_GLASS_COLOR, Math.min(0.6, liftAmount));
-}
-
-function setThemeColorMeta(hexColor) {
-  if (typeof document === 'undefined') return;
-  const metas = document.querySelectorAll('meta[name="theme-color"]');
-  if (!metas.length) {
-    const meta = document.createElement('meta');
-    meta.setAttribute('name', 'theme-color');
-    meta.setAttribute('content', hexColor);
-    document.head.appendChild(meta);
-    return;
+function smoothStrength(value) {
+  const clamped = clamp01(value);
+  if (clamped === 0) return 0;
+  if (clamped <= GLASS_SOFT_START) {
+    return (clamped / GLASS_SOFT_START) * GLASS_SOFT_VALUE;
   }
-  metas.forEach(meta => {
-    const media = meta.getAttribute('media') || '';
-    if (media.includes('prefers-color-scheme: dark')) {
-      meta.setAttribute('content', '#000000');
-    } else {
-      meta.setAttribute('content', hexColor);
-    }
-  });
+  const rest = (clamped - GLASS_SOFT_START) / (1 - GLASS_SOFT_START);
+  return GLASS_SOFT_VALUE + Math.pow(rest, GLASS_EASE_POWER) * (1 - GLASS_SOFT_VALUE);
 }
 
-function applyGlassColor(color) {
-  const softened = softenColor(color);
-  const tuned = adjustForStandalone(softened);
-  glassColorRgb.value = rgbToString(tuned);
-  setThemeColorMeta(rgbToHex(tuned));
-}
-
-function sampleAverageColorFromMedia(media) {
-  const canvas = document.createElement('canvas');
-  const sampleWidth = 24;
-  const sampleHeight = 8;
-  canvas.width = sampleWidth;
-  canvas.height = sampleHeight;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  if (!ctx) return null;
-  const sourceWidth = media.videoWidth || media.naturalWidth || media.width || 0;
-  const sourceHeight = media.videoHeight || media.naturalHeight || media.height || 0;
-  if (!sourceWidth || !sourceHeight) return null;
-  ctx.drawImage(media, 0, 0, sourceWidth, sourceHeight, 0, 0, sampleWidth, sampleHeight);
-  const data = ctx.getImageData(0, 0, sampleWidth, sampleHeight).data;
-  let r = 0;
-  let g = 0;
-  let b = 0;
-  const total = data.length / 4;
-  for (let i = 0; i < data.length; i += 4) {
-    r += data[i];
-    g += data[i + 1];
-    b += data[i + 2];
-  }
-  return {
-    r: r / total,
-    g: g / total,
-    b: b / total
-  };
-}
-
-function sampleAverageColorFromImage(url) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      try {
-        const color = sampleAverageColorFromMedia(img);
-        if (color) resolve(color);
-        else reject(new Error('Canvas not available'));
-      } catch (error) {
-        reject(error);
-      }
-    };
-    img.onerror = reject;
-    img.src = url;
-  });
-}
-
-function sampleAverageColorFromVideo(videoEl) {
-  if (!videoEl || videoEl.readyState < 2) return null;
-  try {
-    return sampleAverageColorFromMedia(videoEl);
-  } catch (error) {
-    return null;
-  }
-}
-
-function getPreferredBackgroundUrl() {
-  if (isMobile.value) {
-    return bgMobileUrl.value || bgPcUrl.value || '';
-  }
-  return bgPcUrl.value || bgMobileUrl.value || '';
-}
-
-function resetGlassColor() {
-  const softened = softenColor(DEFAULT_GLASS_COLOR);
-  const tuned = adjustForStandalone(softened);
-  glassColorRgb.value = rgbToString(tuned);
-  setThemeColorMeta(rgbToHex(tuned));
-}
-
-async function updateGlassColor() {
-  if (typeof window === 'undefined') return;
-  if (prefersDark.value) {
-    const softened = softenColor(DEFAULT_GLASS_COLOR);
-    glassColorRgb.value = rgbToString(softened);
-    setThemeColorMeta('#000000');
-    return;
-  }
-
-  const source = getPreferredBackgroundUrl();
-  if (!source) {
-    resetGlassColor();
-    return;
-  }
-
-  const sampleToken = ++colorSampleId;
-
-  if (isVideoUrl(source)) {
-    const videoEl = isMobile.value ? bgVideoMobile.value : bgVideoPc.value;
-    if (!videoEl) {
-      nextTick(() => {
-        if (sampleToken !== colorSampleId) return;
-        const nextVideoEl = isMobile.value ? bgVideoMobile.value : bgVideoPc.value;
-        const nextColor = sampleAverageColorFromVideo(nextVideoEl);
-        if (nextColor) applyGlassColor(nextColor);
-      });
-      return;
-    }
-    const color = sampleAverageColorFromVideo(videoEl);
-    if (color) {
-      applyGlassColor(color);
-      return;
-    }
-    if (videoEl) {
-      const handleLoaded = () => {
-        if (sampleToken !== colorSampleId) return;
-        const nextColor = sampleAverageColorFromVideo(videoEl);
-        if (nextColor) applyGlassColor(nextColor);
-      };
-      videoEl.addEventListener('loadeddata', handleLoaded, { once: true });
-    }
-    return;
-  }
-
-  try {
-    const color = await sampleAverageColorFromImage(source);
-    if (sampleToken !== colorSampleId) return;
-    applyGlassColor(color);
-  } catch (error) {
-    if (sampleToken !== colorSampleId) return;
-    resetGlassColor();
-  }
-}
 
 const bgPcUrl = computed(() => settings.value.bg_url_pc || '');
 const bgMobileUrl = computed(() => settings.value.bg_url_mobile || '');
@@ -467,10 +291,20 @@ const backgroundStyles = computed(() => {
   const styles = {};
   const rawGlass = settings.value.glass_opacity;
   const rawGlassOp = parseFloat(rawGlass);
-  const glassOpacity = isNaN(rawGlassOp) ? 0.7 : rawGlassOp;
+  const glassStrength = clamp01(isNaN(rawGlassOp) ? 1 : rawGlassOp);
+  const easedStrength = smoothStrength(glassStrength);
+  const glassOpacity = glassStrength === 0 ? 0 : GLASS_ALPHA_FIXED;
+  const hoverOpacity = glassStrength === 0 ? 0 : GLASS_ALPHA_HOVER;
+  const cardBlur = (easedStrength * GLASS_CARD_BLUR_MAX).toFixed(2);
+  const menuBlur = (easedStrength * GLASS_MENU_BLUR_MAX).toFixed(2);
+  styles['--glass-card-filter'] = glassStrength === 0 ? 'none' : `blur(${cardBlur}px)`;
+  styles['--glass-menu-filter'] = glassStrength === 0 ? 'none' : `blur(${menuBlur}px)`;
+  const fallbackOpacity = glassStrength === 0 ? 0 : GLASS_FALLBACK_ALPHA_MIN;
+  const fallbackHoverOpacity = glassStrength === 0 ? 0 : GLASS_FALLBACK_ALPHA_HOVER;
+  styles['--glass-fallback-opacity'] = fallbackOpacity;
+  styles['--glass-fallback-opacity-hover'] = fallbackHoverOpacity;
   styles['--glass-color-rgb'] = glassColorRgb.value; 
   styles['--glass-opacity'] = glassOpacity;
-  const hoverOpacity = Math.min(glassOpacity + 0.15, 1.0);
   styles['--glass-opacity-hover'] = hoverOpacity;
   if (isDark) {
     styles['--dynamic-bg-pc'] = '';
@@ -481,8 +315,7 @@ const backgroundStyles = computed(() => {
   const pcUrl = bgPcUrl.value;
   const mobileUrl = bgMobileUrl.value;
   const rawBgOp = parseFloat(settings.value.bg_opacity);
-  const opacity = isNaN(rawBgOp) ? 0.15 : rawBgOp; 
-  const overlayTint = 1.0 - opacity; 
+  const overlayOpacity = smoothStrength(isNaN(rawBgOp) ? 0.3 : rawBgOp); 
   if (pcUrl && isImageUrl(pcUrl)) {
     styles['--dynamic-bg-pc'] = `url(${pcUrl})`;
   } else {
@@ -494,7 +327,7 @@ const backgroundStyles = computed(() => {
     styles['--dynamic-bg-mobile'] = '';
   }
   if (pcUrl || mobileUrl) {
-    styles['--dynamic-overlay-color'] = `rgba(0, 0, 0, ${overlayTint})`;
+    styles['--dynamic-overlay-color'] = `rgba(0, 0, 0, ${overlayOpacity})`;
   } else {
     styles['--dynamic-overlay-color'] = 'rgba(0, 0, 0, 0)';
   }
@@ -517,8 +350,8 @@ const dynamicTextColor = computed(() => {
 
 const isDarkOverlay = computed(() => {
   if (prefersDark.value) return true;
-  const op = parseFloat(settings.value.bg_opacity || '1');
-  return op <= 0.5;
+  const op = parseFloat(settings.value.bg_opacity || '0');
+  return op >= 0.5;
 });
 
 const containerStyles = computed(() => {
@@ -714,22 +547,6 @@ onMounted(async () => {
 
   }
 
-  if (typeof window !== 'undefined') {
-    const standaloneMedia = window.matchMedia('(display-mode: standalone)');
-    isStandalone.value = standaloneMedia.matches || window.navigator.standalone === true;
-    if (standaloneMedia.addEventListener) {
-      standaloneMedia.addEventListener('change', (event) => {
-        isStandalone.value = event.matches || window.navigator.standalone === true;
-        updateGlassColor();
-      });
-    } else if (standaloneMedia.addListener) {
-      standaloneMedia.addListener((event) => {
-        isStandalone.value = event.matches || window.navigator.standalone === true;
-        updateGlassColor();
-      });
-    }
-  }
-
   isMobile.value = typeof window !== 'undefined' ? window.innerWidth <= 768 : false;
   if (typeof window !== 'undefined') {
     window.addEventListener('resize', handleResize);
@@ -806,22 +623,6 @@ watch(
   () => settings.value.custom_code,
   (newCode) => {
     applyCustomCode(newCode || '');
-  },
-  { immediate: true }
-);
-
-watch(
-  () => [
-    bgPcUrl.value,
-    bgMobileUrl.value,
-    isMobile.value,
-    showVideoBgPc.value,
-    showVideoBgMobile.value,
-    prefersDark.value,
-    isStandalone.value
-  ],
-  () => {
-    updateGlassColor();
   },
   { immediate: true }
 );
@@ -1020,6 +821,14 @@ function handleLogoError(event) {
 
 function onTouchStart(e) {
   if (!isMobile.value) return;
+  const target = e.target;
+  const inMenuBar = menuBarContainer.value && target ? menuBarContainer.value.contains(target) : false;
+  const inSearchSection = searchSectionRef.value && target ? searchSectionRef.value.contains(target) : false;
+  isTouchFromHeader.value = inMenuBar || inSearchSection;
+  if (isTouchFromHeader.value) {
+    isSwiping.value = false;
+    return;
+  }
   if (!e.touches || e.touches.length === 0) return;
   const t = e.touches[0];
   touchStartX.value = t.clientX;
@@ -1030,15 +839,18 @@ function onTouchStart(e) {
 
 function onTouchMove(e) {
   if (!isMobile.value || !isSwiping.value) return;
+  if (isTouchFromHeader.value) return;
   if (!e.touches || e.touches.length === 0) return;
   const t = e.touches[0];
   const dx = t.clientX - touchStartX.value;
   const dy = t.clientY - touchStartY.value;
   const absDx = Math.abs(dx);
   const absDy = Math.abs(dy);
-  const threshold = 10;
+  const threshold = 15;
   if (absDx < threshold && absDy < threshold) return;
   if (absDx > absDy) {
+    const selection = window.getSelection?.();
+    selection?.removeAllRanges?.();
     e.preventDefault();
     touchDeltaX.value = dx;
   } else {
@@ -1050,6 +862,7 @@ function onTouchEnd() {
   if (!isMobile.value) return;
   if (!isSwiping.value) return;
   isSwiping.value = false;
+  isTouchFromHeader.value = false;
   const dx = touchDeltaX.value;
   const threshold = 60;
   if (Math.abs(dx) < threshold) return;
@@ -1081,6 +894,9 @@ function onTouchEnd() {
   padding-top: 50px;
   isolation: isolate;
   color: var(--global-text-color, #000);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .home-container * {
@@ -1097,9 +913,12 @@ function onTouchEnd() {
   top: 0;
   left: 0;
   right: 0;
-  height: 100lvh;
+  min-height: 100vh;
+  height: 100dvh;
   width: 100%;
   object-fit: cover;
+  transform: translateZ(0);
+  will-change: transform;
   z-index: -3;
 }
 
@@ -1109,11 +928,14 @@ function onTouchEnd() {
   top: 0;
   left: 0;
   right: 0;
-  height: 100lvh;
+  min-height: 100vh;
+  height: 100dvh;
   background-image: var(--dynamic-bg-pc);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+  transform: translateZ(0);
+  will-change: transform;
   z-index: -2;
 }
 
@@ -1123,8 +945,11 @@ function onTouchEnd() {
   top: 0;
   left: 0;
   right: 0;
-  height: 100lvh;
+  min-height: 100vh;
+  height: 100dvh;
   background: var(--dynamic-overlay-color, rgba(0, 0, 0, 0));
+  transform: translateZ(0);
+  will-change: transform;
   z-index: -1;
 }
 
@@ -1136,8 +961,13 @@ function onTouchEnd() {
   right: 0;
   width: 100%;
   z-index: 100;
-  backdrop-filter: blur(10px);
+  backdrop-filter: var(--glass-menu-filter, blur(10px));
+  -webkit-backdrop-filter: var(--glass-menu-filter, blur(10px));
   background-color: rgba(var(--glass-color-rgb), var(--glass-opacity));
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
   box-shadow: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.18);
   transition: background-color 0.3s ease;
@@ -1149,8 +979,9 @@ function onTouchEnd() {
   background: rgba(var(--glass-color-rgb), var(--glass-opacity));
   border-radius: 20px;
   padding: 0.3rem;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  backdrop-filter: var(--glass-menu-filter, blur(10px));
+  -webkit-backdrop-filter: var(--glass-menu-filter, blur(10px));
   max-width: 480px;
   width: 92%;
   position: relative;
@@ -1162,6 +993,23 @@ function onTouchEnd() {
   background: rgba(var(--glass-color-rgb), var(--glass-opacity-hover));
 }
 
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .menu-bar-fixed {
+    background-color: rgba(var(--glass-color-rgb), var(--glass-fallback-opacity));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.45);
+  }
+
+  .search-container {
+    background: rgba(var(--glass-color-rgb), var(--glass-fallback-opacity));
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  }
+
+  .search-container:hover {
+    background: rgba(var(--glass-color-rgb), var(--glass-fallback-opacity-hover));
+  }
+}
+
 .search-engine-select {
   display: flex;
   flex-direction: row;
@@ -1170,6 +1018,10 @@ function onTouchEnd() {
   gap: 5px;
   z-index: 2;
   flex-wrap: wrap;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
 }
 
 .engine-btn {
@@ -1184,6 +1036,17 @@ function onTouchEnd() {
   align-items: center;
   gap: 4px;
   text-decoration: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.menu-bar-fixed ::selection,
+.search-section ::selection {
+  background: transparent;
 }
 
 .engine-btn.active,
@@ -1207,6 +1070,9 @@ function onTouchEnd() {
   background: transparent;
   padding: .1rem .5rem;
   font-size: 1.2rem;
+  color: #111827;
+  user-select: text;
+  -webkit-user-select: text;
   outline: none;
 }
 
@@ -1255,6 +1121,15 @@ function onTouchEnd() {
   padding: 1.4rem 0;
   position: relative;
   z-index: 2;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+
+.menu-bar-fixed ::selection,
+.search-section ::selection {
+  background: transparent;
 }
 
 .search-box-wrapper {

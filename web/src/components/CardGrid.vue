@@ -296,7 +296,8 @@ function truncate(str) {
 
 .link-item {
   background-color: rgba(var(--glass-color-rgb, 255, 255, 255), var(--glass-opacity, 0.6));
-  backdrop-filter: blur(8px);
+  backdrop-filter: var(--glass-card-filter, blur(8px));
+  -webkit-backdrop-filter: var(--glass-card-filter, blur(8px));
   border-radius: 15px;
   padding: 0;
   transition: transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94),
@@ -331,6 +332,19 @@ function truncate(str) {
   .link-item:hover {
     background-color: rgba(var(--glass-color-rgb, 255, 255, 255), var(--glass-opacity-hover, 0.75));
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .link-item {
+    background-color: rgba(var(--glass-color-rgb, 255, 255, 255), var(--glass-fallback-opacity, 0.88));
+    border-color: rgba(255, 255, 255, 0.6);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .link-item:hover {
+      background-color: rgba(var(--glass-color-rgb, 255, 255, 255), var(--glass-fallback-opacity-hover, 0.95));
+    }
   }
 }
 

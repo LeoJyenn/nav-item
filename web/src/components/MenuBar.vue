@@ -21,9 +21,10 @@
         <button 
           v-for="subMenu in menu.subMenus" 
           :key="subMenu.id"
-          @click="handleSubMenuClick(subMenu, menu)"
+          @click="handleSubMenuClick(subMenu, menu, $event)"
           :class="{active: subMenu.id === activeSubMenuId}"
           class="sub-menu-item"
+          type="button"
         >
           {{ subMenu.name }}
         </button>
@@ -44,17 +45,16 @@ const props = defineProps({
 const emit = defineEmits(['select']);
 
 const hoveredMenuId = ref(null);
+const isSubMenuOpen = () => hoveredMenuId.value !== null;
 
 function showSubMenu(menuId) {
   hoveredMenuId.value = menuId;
 }
 
 function hideSubMenu(menuId) {
-  setTimeout(() => {
-    if (hoveredMenuId.value === menuId) {
-      hoveredMenuId.value = null;
-    }
-  }, 100);
+  if (hoveredMenuId.value === menuId) {
+    hoveredMenuId.value = null;
+  }
 }
 
 function handleParentClick(menu) {
@@ -65,7 +65,12 @@ function handleParentClick(menu) {
   }
 }
 
-function handleSubMenuClick(subMenu, menu) {
+function handleSubMenuClick(subMenu, menu, event) {
+  if (event?.currentTarget?.blur) {
+    event.currentTarget.blur();
+  }
+  const selection = window.getSelection?.();
+  selection?.removeAllRanges?.();
   emit('select', subMenu, menu);
   hoveredMenuId.value = null;
 }
@@ -75,7 +80,8 @@ function closeAllSubMenus() {
 }
 
 defineExpose({
-  closeAllSubMenus
+  closeAllSubMenus,
+  isSubMenuOpen
 });
 </script>
 
@@ -200,6 +206,10 @@ defineExpose({
   font-weight: 500 !important;
 }
 
+.sub-menu-item:focus {
+  outline: none;
+}
+
 .sub-menu-item::before {
   display: none;
 }
@@ -222,6 +232,12 @@ defineExpose({
     /* 手机端字体大小 */
     font-size: 11px !important; 
     padding: 0.2rem 0.8rem !important;
+  }
+
+  .sub-menu-item.active {
+    background: transparent !important;
+    color: #399dff !important;
+    font-weight: 600 !important;
   }
 }
 </style>
