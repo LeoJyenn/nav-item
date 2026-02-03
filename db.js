@@ -69,13 +69,6 @@ db.serialize(() => {
   )`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_ads_position ON ads(position)`);
 
-  db.run(`CREATE TABLE IF NOT EXISTS friends (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    url TEXT NOT NULL,
-    logo TEXT
-  )`);
-  db.run(`CREATE INDEX IF NOT EXISTS idx_friends_title ON friends(title)`);
 
   db.run(`CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY NOT NULL,
@@ -193,17 +186,6 @@ db.serialize(() => {
     }
   });
 
-  db.get('SELECT COUNT(*) as count FROM friends', (err, row) => {
-    if (row && row.count === 0) {
-      const defaultFriends = [
-        ['Noodseek图床', 'https://www.nodeimage.com', 'https://www.nodeseek.com/static/image/favicon/favicon-32x32.png'],
-        ['Font Awesome', 'https://fontawesome.com', 'https://fontawesome.com/favicon.ico']
-      ];
-      const stmt = db.prepare('INSERT INTO friends (title, url, logo) VALUES (?, ?, ?)');
-      defaultFriends.forEach(([title, url, logo]) => stmt.run(title, url, logo));
-      stmt.finalize();
-    }
-  });
 
   db.run(`ALTER TABLE users ADD COLUMN last_login_time TEXT`, [], () => {});
   db.run(`ALTER TABLE users ADD COLUMN last_login_ip TEXT`, [], () => {});

@@ -87,66 +87,12 @@
     
     <CardGrid :cards="cards" :enableAnimation="shouldAnimateCards" @click.stop /> 
     
-    <footer class="footer">
-      <div class="footer-content">
-        <button @click="showFriendLinks = true" class="friend-link-btn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-          </svg>
-          友情链接
-        </button>
-        <p class="copyright">
-          Copyright © 2025 Nav-Item |
-          <a href="https://github.com/LeoJyenn/nav-item" target="_blank" class="footer-link">Powered by LeoJyenn</a>
-        </p>
-      </div>
-    </footer>
-
-    <div v-if="showFriendLinks" class="modal-overlay" @click="showFriendLinks = false">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h3>友情链接</h3>
-          <button @click="showFriendLinks = false" class="close-btn">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M18 6L6 18M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-        <div class="modal-body">
-          <div class="friend-links-grid">
-            <a 
-              v-for="friend in friendLinks" 
-              :key="friend.id" 
-              :href="friend.url" 
-              target="_blank" 
-              class="friend-link-card"
-            >
-              <div class="friend-link-logo">
-                <img 
-                  v-if="friend.logo" 
-                  :src="friend.logo" 
-                  :alt="friend.title"
-                  @error="handleLogoError"
-                />
-                <div v-else class="friend-link-placeholder">
-                  {{ friend.title.charAt(0) }}
-                </div>
-              </div>
-              <div class="friend-link-info">
-                <h4>{{ friend.title }}</h4>
-              </div>
-            </a>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed, watch, nextTick, onBeforeUnmount } from 'vue'; 
-import { getMenus, getCards, getAds, getFriends, globalSearchCards, getSettings } from '../api'; 
+import { getMenus, getCards, getAds, globalSearchCards, getSettings } from '../api'; 
 import MenuBar from '../components/MenuBar.vue';
 import CardGrid from '../components/CardGrid.vue';
 
@@ -157,8 +103,6 @@ const cards = ref([]);
 const searchQuery = ref('');
 const leftAds = ref([]);
 const rightAds = ref([]);
-const showFriendLinks = ref(false);
-const friendLinks = ref([]);
 const isGlobalSearchActive = ref(false);
 let debounceTimer = null;
 const shouldAnimateCards = ref(true);
@@ -552,11 +496,10 @@ onMounted(async () => {
     window.addEventListener('resize', handleResize);
   }
 
-  const [settingsRes, menusRes, adsRes, friendsRes] = await Promise.allSettled([
+  const [settingsRes, menusRes, adsRes] = await Promise.allSettled([
     getSettings(),
     getMenus(),
-    getAds(),
-    getFriends()
+    getAds()
   ]);
 
   if (settingsRes.status === 'fulfilled') {
@@ -591,9 +534,6 @@ onMounted(async () => {
     rightAds.value = adsRes.value.data.filter(ad => ad.position === 'right');
   }
 
-  if (friendsRes.status === 'fulfilled') {
-    friendLinks.value = friendsRes.value.data;
-  }
 });
 
 onBeforeUnmount(() => {
@@ -810,13 +750,6 @@ function prefetchAdjacentMenus() {
       setTimeout(runPrefetch, 150);
     }
   });
-}
-
-function handleLogoError(event) {
-  event.target.style.display = 'none';
-  if (event.target.nextElementSibling) {
-    event.target.nextElementSibling.style.display = 'flex';
-  }
 }
 
 function onTouchStart(e) {
@@ -1199,169 +1132,6 @@ function onTouchEnd() {
   justify-content: center;
 }
 
-.footer {
-  margin-top: auto;
-  text-align: center;
-  padding-top: 1rem;
-  padding-bottom: 2rem;
-  position: relative;
-  z-index: 2;
-}
-
-.footer-content {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 40px;
-}
-
-.friend-link-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-size: 14px;
-  padding: 0;
-}
-
-.copyright {
-  font-size: 14px;
-  margin: 0;
-  text-shadow: none;
-}
-
-.footer-link {
-  text-decoration: none;
-  transition: color 0.2s;
-}
-
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  backdrop-filter: blur(5px);
-}
-
-.modal-content {
-  background: #ffffff;
-  border-radius: 16px;
-  width: 55rem;
-  height: 30rem;
-  max-width: 95vw;
-  max-height: 95vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  overflow: hidden;
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 20px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f9f9ff;
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 8px;
-  transition: all 0.2s;
-}
-
-.close-btn:hover {
-  background: #f3f4f6;
-}
-
-.modal-body {
-  flex: 1;
-  padding: 32px;
-  overflow-y: auto;
-}
-
-.friend-links-grid {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 12px;
-}
-
-.friend-link-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 6px;
-  background: #f5f5f5;
-  border-radius: 15px;
-  text-decoration: none;
-  transition: all 0.2s ease;
-  border: 1px solid #eee;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.friend-link-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  background: #e9e9e9;
-}
-
-.friend-link-logo {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-  overflow: hidden;
-  margin-bottom: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: white;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
-}
-
-.friend-link-logo img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.friend-link-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #e5e7eb;
-  font-size: 18px;
-  font-weight: 600;
-  border-radius: 8px;
-}
-
-.friend-link-info h4 {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 500;
-  text-align: center;
-  line-height: 1.3;
-  word-break: break-all;
-}
 
 :deep(.menu-bar) {
   position: relative;
@@ -1485,32 +1255,6 @@ function onTouchEnd() {
     padding: 1rem 0.5rem;
   }
 
-  .footer {
-    padding-top: 2rem;
-  }
-
-  .footer-content {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-wrap: nowrap;
-    gap: 12px;
-    padding: 0 12px;
-    width: 100%;
-    box-sizing: border-box;
-  }
-
-  .friend-link-btn {
-    font-size: clamp(8px, 2.9vw, 13px);
-  }
-
-  .copyright {
-    font-size: clamp(8px, 2.9vw, 13px);
-  }
-
-  .friend-links-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
 
   .container {
     width: 95%;

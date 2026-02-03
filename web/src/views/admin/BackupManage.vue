@@ -10,7 +10,7 @@
         导出备份
       </h2>
       <p class="card-desc">
-        点击下面的按钮，将当前所有数据（栏目、卡片、用户、广告、友链等）以及上传的图片打包为一个
+        点击下面的按钮，将当前所有数据（栏目、卡片、用户、广告等）以及上传的图片打包为一个
         <code>.zip</code> 文件，请妥善保存这个备份文件。
       </p>
       <button class="btn" @click="handleExport" :disabled="isExporting || isImporting">

@@ -156,14 +156,6 @@ export const updateAd = (id, data) =>
 export const deleteAd = (id) =>
   axios.delete(`${BASE}/ads/${id}`, { headers: authHeaders() });
 
-export const getFriends = () => axios.get(`${BASE}/friends`);
-export const addFriend = (data) =>
-  axios.post(`${BASE}/friends`, data, { headers: authHeaders() });
-export const updateFriend = (id, data) =>
-  axios.put(`${BASE}/friends/${id}`, data, { headers: authHeaders() });
-export const deleteFriend = (id) =>
-  axios.delete(`${BASE}/friends/${id}`, { headers: authHeaders() });
-
 export const getUserProfile = () =>
   axios.get(`${BASE}/users/profile`, { headers: authHeaders() });
 export const changePassword = (oldPassword, newPassword) =>
