@@ -331,7 +331,26 @@ function truncate(str) {
 @media (hover: hover) and (pointer: fine) {
   .link-item:hover {
     background-color: rgba(var(--glass-color-rgb, 255, 255, 255), var(--glass-opacity-hover, 0.75));
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15),
+      0 0 0 1px rgba(255, 255, 255, 0.18) inset;
+    transform: translateY(-6px) scale(1.025);
+    border-color: rgba(255, 255, 255, 0.45);
+  }
+  
+  .link-item:hover .link-icon {
+    transform: scale(1.22) rotate(4deg);
+    filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.2));
+  }
+  
+  .link-item:hover .link-text {
+    color: var(--global-text-color, #000);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .link-item:active {
+    transform: translateY(-2px) scale(1.01);
+    transition-duration: 0.1s;
   }
 }
 
@@ -344,7 +363,45 @@ function truncate(str) {
   @media (hover: hover) and (pointer: fine) {
     .link-item:hover {
       background-color: rgba(var(--glass-color-rgb, 255, 255, 255), var(--glass-fallback-opacity-hover, 0.95));
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+      transform: translateY(-6px) scale(1.025);
     }
+    
+    .link-item:hover .link-icon {
+      transform: scale(1.22) rotate(4deg);
+    }
+  }
+}
+
+.link-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .link-item:hover::before {
+    opacity: 1;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%) skewX(-15deg);
+  }
+  100% {
+    transform: translateX(200%) skewX(-15deg);
   }
 }
 
@@ -371,6 +428,7 @@ function truncate(str) {
   object-fit: contain;
   aspect-ratio: 1 / 1;
   display: block;
+  transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.3s ease;
 }
 
 @media (max-width: 480px) {
