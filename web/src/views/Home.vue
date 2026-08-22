@@ -87,14 +87,16 @@
     
     <CardGrid :cards="cards" :enableAnimation="shouldAnimateCards" @click.stop /> 
     
+    <LockScreen v-if="isLocked" @unlocked="onUnlocked" />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed, watch, nextTick, onBeforeUnmount } from 'vue'; 
-import { getMenus, getCards, getAds, globalSearchCards, getSettings } from '../api'; 
+import { getMenus, getCards, getAds, globalSearchCards, getSettings, getLockStatus } from '../api'; 
 import MenuBar from '../components/MenuBar.vue';
 import CardGrid from '../components/CardGrid.vue';
+import LockScreen from '../components/LockScreen.vue';
 
 const menus = ref([]);
 const activeMenu = ref(null);
@@ -143,6 +145,11 @@ const isSwiping = ref(false);
 const isTouchFromHeader = ref(false);
 
 const needScrollToTop = ref(false);
+
+const isLocked = ref(false);
+const lockIdleTimeout = ref(120);
+let lockIdleTimer = null;
+const lockIdleEvents = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'wheel'];
 
 const bgVideoPc = ref(null);
 const bgVideoMobile = ref(null);
@@ -515,6 +522,43 @@ onMounted(async () => {
     console.error("加载网站设置失败:", settingsRes.reason);
   }
 
+  const lockEnabled = settings.value.lock_enabled === '1';
+  if (lockEnabled) {
+    lockIdleTimeout.value = parseInt(settings.value.lock_idle_timeout, 10) || 120;
+    try {
+      const statusRes = await getLockStatus();
+      const status = statusRes.data || {};
+      if (status.locked && !status.tokenValid) {
+        sessionStorage.removeItem('unlock_token');
+        cards.value = [];
+        isLocked.value = true;
+        // 菜单结构与广告为公开数据，锁屏期间正常展示；卡片保持隐藏
+        if (menusRes.status === 'fulfilled') {
+          menus.value = menusRes.value.data;
+          await nextTick();
+          measureMenuBar();
+        }
+        if (adsRes.status === 'fulfilled') {
+          leftAds.value = adsRes.value.data.filter(ad => ad.position === 'left');
+          rightAds.value = adsRes.value.data.filter(ad => ad.position === 'right');
+        }
+        startLockIdleTimer();
+        return;
+      }
+    } catch (e) {
+      console.error("检查锁屏状态失败:", e);
+    }
+  }
+
+  startLockIdleTimer();
+  await loadInitialData(menusRes, adsRes);
+
+});
+
+async function loadInitialData(preloadedMenusRes = null, preloadedAdsRes = null) {
+  const menusRes = preloadedMenusRes || await getMenus().then(res => ({ status: 'fulfilled', value: res })).catch(reason => ({ status: 'rejected', reason }));
+  const adsRes = preloadedAdsRes || await getAds().then(res => ({ status: 'fulfilled', value: res })).catch(reason => ({ status: 'rejected', reason }));
+
   if (menusRes.status === 'fulfilled') {
     menus.value = menusRes.value.data;
     await nextTick();
@@ -533,13 +577,47 @@ onMounted(async () => {
     leftAds.value = adsRes.value.data.filter(ad => ad.position === 'left');
     rightAds.value = adsRes.value.data.filter(ad => ad.position === 'right');
   }
+}
 
-});
+function onUnlocked(payload) {
+  isLocked.value = false;
+  resetLockIdleTimer();
+  if (payload && payload.idleTimeout) {
+    lockIdleTimeout.value = payload.idleTimeout;
+    resetLockIdleTimer();
+  }
+  loadInitialData();
+}
+
+function resetLockIdleTimer() {
+  clearTimeout(lockIdleTimer);
+  if (isLocked.value) return;
+  lockIdleTimer = setTimeout(() => {
+    sessionStorage.removeItem('unlock_token');
+    cards.value = [];
+    isLocked.value = true;
+  }, Math.max(10, lockIdleTimeout.value) * 1000);
+}
+
+function startLockIdleTimer() {
+  lockIdleEvents.forEach(evt => {
+    window.addEventListener(evt, resetLockIdleTimer, { passive: true });
+  });
+  resetLockIdleTimer();
+}
+
+function stopLockIdleTimer() {
+  lockIdleEvents.forEach(evt => {
+    window.removeEventListener(evt, resetLockIdleTimer);
+  });
+  clearTimeout(lockIdleTimer);
+}
 
 onBeforeUnmount(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('resize', handleResize);
   }
+  stopLockIdleTimer();
   if (colorSchemeMedia && colorSchemeMedia._handler) {
     if (colorSchemeMedia.removeEventListener) {
       colorSchemeMedia.removeEventListener('change', colorSchemeMedia._handler);
@@ -820,7 +898,8 @@ function onTouchEnd() {
 <style scoped>
 .home-container {
   background-color: transparent;
-  min-height: 95vh;
+  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   position: relative;

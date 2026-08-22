@@ -10,8 +10,12 @@ const adRoutes = require('./routes/ad');
 const userRoutes = require('./routes/user');
 const backupRoutes = require('./routes/backup'); 
 const settingsRoutes = require('./routes/settings'); 
+const lockRoutes = require('./routes/lock');
+const { unlockGuard, publicGetGuard } = require('./routes/lockMiddleware');
 const compression = require('compression');
 const app = express();
+
+app.set('trust proxy', 1);
 
 const PORT = process.env.PORT || 3000;
 
@@ -34,11 +38,12 @@ app.use((req, res, next) => {
   }
 });
 
-app.use('/api/menus', menuRoutes);
-app.use('/api/cards', cardRoutes);
+app.use('/api/lock', lockRoutes);
+app.use('/api/menus', publicGetGuard, menuRoutes);
+app.use('/api/cards', unlockGuard, cardRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api', authRoutes);
-app.use('/api/ads', adRoutes);
+app.use('/api/ads', publicGetGuard, adRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/backup', backupRoutes);
 app.use('/api/settings', settingsRoutes);

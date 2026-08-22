@@ -92,6 +92,10 @@ db.serialize(() => {
   settingsStmt.run('custom_css', '/* 自定义样式 */');
   settingsStmt.run('font_color_mode', 'auto');
   settingsStmt.run('custom_code', '');
+  settingsStmt.run('lock_enabled', '0');
+  settingsStmt.run('lock_password_hash', '');
+  settingsStmt.run('lock_idle_timeout', '120');
+  settingsStmt.run('lock_token_version', '1');
   settingsStmt.finalize();
 
   db.get('SELECT COUNT(*) as count FROM menus', (err, row) => {
@@ -181,7 +185,7 @@ db.serialize(() => {
 
   db.get('SELECT COUNT(*) as count FROM users', (err, row) => {
     if (row && row.count === 0) {
-      const passwordHash = bcrypt.hashSync(config.admin.password, 10);
+        const passwordHash = bcrypt.hashSync(config.admin.password, 12);
       db.run('INSERT INTO users (username, password) VALUES (?, ?)', [config.admin.username, passwordHash]);
     }
   });

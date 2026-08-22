@@ -94,12 +94,50 @@
         <span v-if="message" class="save-message">{{ message }}</span>
       </div>
     </div>
+
+    <div class="settings-card lock-settings-card">
+      <h3 class="lock-section-title">锁屏密码</h3>
+      <p class="lock-section-desc">开启后，访客打开主页需输入密码才能查看内容；空闲超时或修改密码后会自动重新上锁。</p>
+
+      <div class="form-row switch-row">
+        <label class="form-label">启用锁屏</label>
+        <button
+          type="button"
+          :class="['switch', { on: lockForm.enabled }]"
+          @click="lockForm.enabled = !lockForm.enabled"
+        >
+          <span class="switch-knob"></span>
+        </button>
+      </div>
+
+      <div class="form-row">
+        <label class="form-label">空闲自动锁定（秒，10 - 86400）</label>
+        <input v-model.number="lockForm.idleTimeout" type="number" min="10" max="86400" class="input" />
+      </div>
+
+      <div class="form-row" v-if="hasLockPassword">
+        <label class="form-label">当前密码（修改密码时必填）</label>
+        <input v-model="lockForm.currentPassword" type="password" class="input" autocomplete="off" />
+      </div>
+
+      <div class="form-row">
+        <label class="form-label">{{ hasLockPassword ? '新密码（留空则不修改）' : '设置锁屏密码' }}</label>
+        <input v-model="lockForm.newPassword" type="password" class="input" autocomplete="new-password" placeholder="至少 4 位" />
+      </div>
+
+      <div class="form-actions">
+        <button class="btn primary" @click="handleSaveLock" :disabled="savingLock">
+          {{ savingLock ? '保存中...' : '保存锁屏设置' }}
+        </button>
+        <span v-if="lockMessage" :class="['save-message', { 'save-error': !lockSuccess }]">{{ lockMessage }}</span>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
-import { getSettings, updateSettings } from '../../api';
+import { getSettings, updateSettings, updateLockConfig, getLockStatus } from '../../api';
 
 const form = ref({
   bg_url_pc: '',
@@ -112,6 +150,17 @@ const form = ref({
 
 const saving = ref(false);
 const message = ref('');
+
+const lockForm = ref({
+  enabled: false,
+  idleTimeout: 120,
+  currentPassword: '',
+  newPassword: ''
+});
+const hasLockPassword = ref(false);
+const savingLock = ref(false);
+const lockMessage = ref('');
+const lockSuccess = ref(true);
 const PREVIEW_CARD_BLUR_MAX = 10;
 const PREVIEW_MENU_BLUR_MAX = 12;
 const PREVIEW_GLASS_ALPHA_FIXED = 0;
@@ -196,6 +245,17 @@ onMounted(async () => {
     form.value.glass_opacity = isNaN(glassOp) ? 1 : glassOp;
 
     form.value.custom_code = data.custom_code || '';
+
+    lockForm.value.enabled = data.lock_enabled === '1';
+    const idleT = parseInt(data.lock_idle_timeout, 10);
+    lockForm.value.idleTimeout = isNaN(idleT) ? 120 : idleT;
+
+    try {
+      const statusRes = await getLockStatus();
+      hasLockPassword.value = !!(statusRes.data && statusRes.data.hasPassword);
+    } catch (e) {
+      console.error('加载锁屏状态失败', e);
+    }
   } catch (e) {
     console.error('加载设置失败', e);
   }
@@ -226,6 +286,43 @@ async function handleSave() {
     message.value = '保存失败，请稍后再试';
   } finally {
     saving.value = false;
+  }
+}
+
+async function handleSaveLock() {
+  if (savingLock.value) return;
+  savingLock.value = true;
+  lockMessage.value = '';
+
+  try {
+    const payload = {
+      enabled: lockForm.value.enabled,
+      idleTimeout: lockForm.value.idleTimeout
+    };
+    const newPwd = (lockForm.value.newPassword || '').trim();
+    if (newPwd) {
+      payload.newPassword = newPwd;
+      payload.currentPassword = lockForm.value.currentPassword || '';
+    }
+
+    const res = await updateLockConfig(payload);
+    lockSuccess.value = true;
+    lockMessage.value = res.data && res.data.message ? res.data.message : '已保存';
+    lockForm.value.currentPassword = '';
+    lockForm.value.newPassword = '';
+    try {
+      const statusRes = await getLockStatus();
+      hasLockPassword.value = !!(statusRes.data && statusRes.data.hasPassword);
+    } catch (e) { /* ignore */ }
+    setTimeout(() => {
+      lockMessage.value = '';
+    }, 2500);
+  } catch (e) {
+    lockSuccess.value = false;
+    const msg = e.response && e.response.data && e.response.data.error;
+    lockMessage.value = msg || '保存失败，请稍后再试';
+  } finally {
+    savingLock.value = false;
   }
 }
 </script>
@@ -438,6 +535,67 @@ async function handleSave() {
 .save-message {
   font-size: 0.85rem;
   color: #16a34a;
+}
+
+.save-error {
+  color: #dc2626;
+}
+
+.lock-settings-card {
+  margin-top: 16px;
+  border-radius: 12px;
+}
+
+.lock-section-title {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.lock-section-desc {
+  margin: 0 0 16px;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.switch-row {
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.switch {
+  width: 46px;
+  height: 26px;
+  border-radius: 999px;
+  border: none;
+  background: #d1d5db;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.switch.on {
+  background: #2563eb;
+}
+
+.switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s;
+}
+
+.switch.on .switch-knob {
+  transform: translateX(20px);
 }
 
 @media (max-width: 768px) {

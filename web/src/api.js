@@ -3,6 +3,14 @@ const BASE = '/api';
 
 let showingLogoutAlert = false;
 
+axios.interceptors.request.use(config => {
+  const unlockToken = sessionStorage.getItem('unlock_token');
+  if (unlockToken && !config.headers['x-unlock-token']) {
+    config.headers['x-unlock-token'] = unlockToken;
+  }
+  return config;
+});
+
 axios.interceptors.response.use(
   res => res,
   err => {
@@ -84,7 +92,7 @@ function authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export const getMenus = () => axios.get(`${BASE}/menus`);
+export const getMenus = () => axios.get(`${BASE}/menus`, { headers: authHeaders() });
 export const addMenu = (data) =>
   axios.post(`${BASE}/menus`, data, { headers: authHeaders() });
 export const updateMenu = (id, data) =>
@@ -93,7 +101,7 @@ export const deleteMenu = (id) =>
   axios.delete(`${BASE}/menus/${id}`, { headers: authHeaders() });
 
 export const getSubMenus = (menuId) =>
-  axios.get(`${BASE}/menus/${menuId}/submenus`);
+  axios.get(`${BASE}/menus/${menuId}/submenus`, { headers: authHeaders() });
 export const addSubMenu = (menuId, data) =>
   axios.post(`${BASE}/menus/${menuId}/submenus`, data, {
     headers: authHeaders()
@@ -105,7 +113,7 @@ export const deleteSubMenu = (id) =>
 
 export const getCards = (menuId, subMenuId = null) => {
   const params = subMenuId ? { subMenuId } : {};
-  return axios.get(`${BASE}/cards/${menuId}`, { params });
+  return axios.get(`${BASE}/cards/${menuId}`, { params, headers: authHeaders() });
 };
 export const addCard = (data) =>
   axios.post(`${BASE}/cards`, data, { headers: authHeaders() });
@@ -115,7 +123,7 @@ export const deleteCard = (id) =>
   axios.delete(`${BASE}/cards/${id}`, { headers: authHeaders() });
 
 export const globalSearchCards = (query) => {
-  return axios.get(`${BASE}/cards/search`, { params: { q: query } });
+  return axios.get(`${BASE}/cards/search`, { params: { q: query }, headers: authHeaders() });
 };
 
 export const uploadLogo = (file) => {
@@ -148,13 +156,21 @@ export const deleteUploadImage = (id) => {
   });
 };
 
-export const getAds = () => axios.get(`${BASE}/ads`);
+export const getAds = () => axios.get(`${BASE}/ads`, { headers: authHeaders() });
 export const addAd = (data) =>
   axios.post(`${BASE}/ads`, data, { headers: authHeaders() });
 export const updateAd = (id, data) =>
   axios.put(`${BASE}/ads/${id}`, data, { headers: authHeaders() });
 export const deleteAd = (id) =>
   axios.delete(`${BASE}/ads/${id}`, { headers: authHeaders() });
+
+export const getFriends = () => axios.get(`${BASE}/friends`);
+export const addFriend = (data) =>
+  axios.post(`${BASE}/friends`, data, { headers: authHeaders() });
+export const updateFriend = (id, data) =>
+  axios.put(`${BASE}/friends/${id}`, data, { headers: authHeaders() });
+export const deleteFriend = (id) =>
+  axios.delete(`${BASE}/friends/${id}`, { headers: authHeaders() });
 
 export const getUserProfile = () =>
   axios.get(`${BASE}/users/profile`, { headers: authHeaders() });
@@ -190,6 +206,20 @@ export const getSettings = () => {
 };
 export const updateSettings = (settingsData) => {
   return axios.post(`${BASE}/settings`, settingsData, {
+    headers: authHeaders()
+  });
+};
+
+export const verifyLockPassword = (password) => {
+  return axios.post(`${BASE}/lock/verify`, { password });
+};
+
+export const getLockStatus = () => {
+  return axios.post(`${BASE}/lock/status`);
+};
+
+export const updateLockConfig = (data) => {
+  return axios.post(`${BASE}/lock/config`, data, {
     headers: authHeaders()
   });
 };

@@ -3,12 +3,15 @@ const router = express.Router();
 const db = require('../db');
 const auth = require('./authMiddleware');
 
+const SENSITIVE_KEYS = ['lock_password_hash'];
+
 router.get('/', (req, res) => {
   db.all('SELECT * FROM settings', [], (err, rows) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
     const settings = rows.reduce((acc, row) => {
+      if (SENSITIVE_KEYS.includes(row.key)) return acc;
       acc[row.key] = row.value;
       return acc;
     }, {});

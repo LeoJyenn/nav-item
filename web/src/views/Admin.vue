@@ -100,6 +100,7 @@
         <li :class="{active: page==='menu'}" @click="page='menu'; closeSider()">栏目管理</li>
         <li :class="{active: page==='card'}" @click="page='card'; closeSider()">卡片管理</li>
         <li :class="{active: page==='ad'}" @click="page='ad'; closeSider()">广告管理</li>
+        <li :class="{active: page==='friend'}" @click="page='friend'; closeSider()">友链管理</li>
         <li :class="{active: page==='upload'}" @click="page='upload'; closeSider()">文件管理</li>
         <li :class="{active: page==='settings'}" @click="page='settings'; closeSider()">外观设置</li>
         <li :class="{active: page==='backup'}" @click="page='backup'; closeSider()">数据备份</li>
@@ -164,6 +165,7 @@
         <MenuManage v-if="page==='menu'" />
         <CardManage v-if="page==='card'" />
         <AdManage v-if="page==='ad'" />
+        <FriendLinkManage v-if="page==='friend'" />
         <FileUploadManage v-if="page==='upload'" />
         <UserManage v-if="page==='user'" />
         <BackupManage v-if="page==='backup'" />
@@ -190,6 +192,7 @@ import { login } from '../api'
 import MenuManage from './admin/MenuManage.vue'
 import CardManage from './admin/CardManage.vue'
 import AdManage from './admin/AdManage.vue'
+import FriendLinkManage from './admin/FriendLinkManage.vue'
 import UserManage from './admin/UserManage.vue'
 import BackupManage from './admin/BackupManage.vue'
 import SiteSettings from './admin/SiteSettings.vue'
@@ -212,6 +215,7 @@ const pageTitle = computed(() => {
     case 'menu': return '栏目管理'
     case 'card': return '卡片管理'
     case 'ad': return '广告管理'
+    case 'friend': return '友链管理'
     case 'upload': return '文件管理'
     case 'user': return '用户管理'
     case 'backup': return '数据备份'

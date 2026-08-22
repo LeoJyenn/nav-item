@@ -3,8 +3,41 @@ const db = require('../db');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const router = express.Router();
+const config = require('../config');
 
-const JWT_SECRET = 'your_jwt_secret_key';
+const JWT_SECRET = config.server.jwtSecret;
+
+const BCRYPT_ROUNDS = 12;
+const loginAttempts = new Map();
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_ATTEMPTS = 5;
+
+function getClientIp(req) {
+  let ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || '';
+  if (typeof ip === 'string' && ip.includes(',')) ip = ip.split(',')[0].trim();
+  if (typeof ip === 'string' && ip.startsWith('::ffff:')) ip = ip.replace('::ffff:', '');
+  return ip;
+}
+
+function isLoginBlocked(ip) {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now - entry.start > LOGIN_WINDOW_MS) {
+    loginAttempts.delete(ip);
+    return false;
+  }
+  return entry.count >= LOGIN_MAX_ATTEMPTS;
+}
+
+function recordLoginFailure(ip) {
+  const now = Date.now();
+  let entry = loginAttempts.get(ip);
+  if (!entry || now - entry.start > LOGIN_WINDOW_MS) {
+    entry = { start: now, count: 0 };
+    loginAttempts.set(ip, entry);
+  }
+  entry.count++;
+}
 
 function getClientIp(req) {
   let ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || '';
@@ -30,21 +63,40 @@ function getShanghaiTime() {
 }
 
 router.post('/login', (req, res) => {
+  const ip = getClientIp(req);
+  if (isLoginBlocked(ip)) {
+    return res.status(429).json({ error: '尝试次数过多，请15分钟后再试' });
+  }
   const { username, password } = req.body;
   db.get('SELECT * FROM users WHERE username=?', [username], (err, user) => {
-    if (err || !user) return res.status(401).json({ error: '用户名或密码错误' });
+    if (err || !user) {
+      recordLoginFailure(ip);
+      return res.status(401).json({ error: '用户名或密码错误' });
+    }
     bcrypt.compare(password, user.password, (err, result) => {
       if (result) {
+        loginAttempts.delete(ip);
+        // 透明升级：旧轮数哈希在成功验证后用新轮数重写
+        const roundsMatch = /\$2[aby]\$(\d+)\$/.exec(user.password);
+        const currentRounds = roundsMatch ? parseInt(roundsMatch[1], 10) : BCRYPT_ROUNDS;
+        if (currentRounds < BCRYPT_ROUNDS) {
+          bcrypt.hash(password, BCRYPT_ROUNDS, (hashErr, newHash) => {
+            if (!hashErr) {
+              db.run('UPDATE users SET password = ? WHERE id = ?', [newHash, user.id]);
+            }
+          });
+        }
         // 记录上次登录时间和IP
         const lastLoginTime = user.last_login_time;
         const lastLoginIp = user.last_login_ip;
         // 更新为本次登录（上海时间）
         const now = getShanghaiTime();
-        const ip = getClientIp(req);
-        db.run('UPDATE users SET last_login_time=?, last_login_ip=? WHERE id=?', [now, ip, user.id]);
+        const loginIp = getClientIp(req);
+        db.run('UPDATE users SET last_login_time=?, last_login_ip=? WHERE id=?', [now, loginIp, user.id]);
         const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '2h' });
         res.json({ token, lastLoginTime, lastLoginIp });
       } else {
+        recordLoginFailure(ip);
         res.status(401).json({ error: '用户名或密码错误' });
       }
     });
