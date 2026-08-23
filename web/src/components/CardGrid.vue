@@ -451,7 +451,7 @@ function truncate(str) {
   aspect-ratio: 1 / 1;
   display: block;
   /* 统一视觉底板：不同来源/留白的图标都坐在同一块圆角瓷砖上 */
-  background: rgba(127, 127, 127, 0.16);
+  background: #ffffff;
   border-radius: 8px;
   transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.3s ease;
 }
