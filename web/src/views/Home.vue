@@ -584,8 +584,12 @@ function onUnlocked(payload) {
     lockIdleTimeout.value = payload.idleTimeout;
   }
   if (menus.value.length > 0) {
-    // 锁屏期间菜单/广告已加载在内存：解锁后只补拉受保护的卡片数据，
-    // 省去公网环境下的两个重复往返
+    // 锁屏期间已加载过菜单：补齐默认选中（保留解锁前的选择），然后只补拉卡片
+    if (!activeMenu.value) {
+      activeMenu.value = menus.value[0];
+      needScrollToTop.value = false;
+      shouldAnimateCards.value = true;
+    }
     loadCards();
   } else {
     loadInitialData();
