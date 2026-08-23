@@ -209,7 +209,9 @@ export const importBackup = (formData, onUploadProgress) => {
 };
 
 export const getSettings = () => {
-  return axios.get(`${BASE}/settings`);
+  // 携带认证头：管理员可读到完整配置（含锁屏表单回显字段），
+  // 匿名访客无令牌时后端自动按匿名剥离敏感字段
+  return axios.get(`${BASE}/settings`, { headers: authHeaders() });
 };
 export const updateSettings = (settingsData) => {
   return axios.post(`${BASE}/settings`, settingsData, {
