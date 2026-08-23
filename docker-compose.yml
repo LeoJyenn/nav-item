@@ -2,14 +2,14 @@ version: '3'
 
 services:
   nav-item:
-    image: eooce/nav-item
+    image: leojyenn/nav-item:latest
     container_name: nav-item
     ports:
-      - "3000:3000"
-    environment:
-      - PORT=3000             # 监听端口
-      - ADMIN_USERNAME=admin  # 后台用户名
-      - ADMIN_PASSWORD=123456 # 后台密码
+      - "127.0.0.1:3000:3000"   # 只绑定本机回环，外网无法直连，由反向代理对外提供服务
     volumes:
-      - ./database:/app/database  # 持久化数据库文件
+      - ./data:/app/data        # 持久化：数据库 + JWT密钥 + 上传文件 + 运行日志
     restart: unless-stopped
+    # 如需自定义初始管理员账号（仅首次建库时生效），取消注释：
+    # environment:
+    #   - ADMIN_USERNAME=admin
+    #   - ADMIN_PASSWORD=你的强密码
