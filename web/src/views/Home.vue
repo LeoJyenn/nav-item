@@ -922,14 +922,12 @@ function onTouchEnd() {
 <style scoped>
 .home-container {
   background-color: transparent;
-  box-sizing: border-box;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
   position: relative;
-  /* 顶部偏移合并安全区：文档高度恰好一屏，无溢出无滚动条 */
-  padding-top: calc(50px + env(safe-area-inset-top));
+  padding-top: 50px;
   /* 底部安全区：最后一张卡片不被 Home 指示条遮挡 */
   padding-bottom: env(safe-area-inset-bottom);
   isolation: isolate;
