@@ -524,7 +524,7 @@ onMounted(async () => {
 
   const lockEnabled = settings.value.lock_enabled === '1';
   if (lockEnabled) {
-    lockIdleTimeout.value = parseInt(settings.value.lock_idle_timeout, 10) || 120;
+    lockIdleTimeout.value = parseInt(settings.value.lock_idle_timeout, 10) || 300;
     try {
       const statusRes = await getLockStatus();
       const status = statusRes.data || {};
@@ -581,18 +581,37 @@ async function loadInitialData(preloadedMenusRes = null, preloadedAdsRes = null)
 
 function onUnlocked(payload) {
   isLocked.value = false;
-  resetLockIdleTimer();
   if (payload && payload.idleTimeout) {
     lockIdleTimeout.value = payload.idleTimeout;
-    resetLockIdleTimer();
   }
+  if (payload && payload.serverUnlocked) {
+    // 服务器端锁屏已被关闭/清除：保持解锁，空闲计时继续轮询状态
+    resetLockIdleTimer();
+    loadInitialData();
+    return;
+  }
+  resetLockIdleTimer();
   loadInitialData();
 }
 
-function resetLockIdleTimer() {
+async function resetLockIdleTimer() {
   clearTimeout(lockIdleTimer);
   if (isLocked.value) return;
-  lockIdleTimer = setTimeout(() => {
+  lockIdleTimer = setTimeout(async () => {
+    try {
+      // 空闲触发时先向服务器确认真实锁屏状态，避免幽灵锁屏
+      const res = await getLockStatus();
+      const st = res.data || {};
+      if (!st.locked || st.tokenValid) {
+        // 未启用锁 或 本设备令牌仍有效：保持解锁并重新计时
+        resetLockIdleTimer();
+        return;
+      }
+    } catch (e) {
+      // 状态确认失败时不误锁，稍后重试
+      resetLockIdleTimer();
+      return;
+    }
     sessionStorage.removeItem('unlock_token');
     cards.value = [];
     isLocked.value = true;

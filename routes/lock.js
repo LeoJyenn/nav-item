@@ -64,7 +64,7 @@ async function ensureLockDefaults() {
       const defaults = {
         lock_enabled: '0',
         lock_password_hash: '',
-        lock_idle_timeout: '120',
+        lock_idle_timeout: '300',
         lock_token_version: '1'
       };
       await setSetting(key, defaults[key]);
@@ -108,7 +108,7 @@ router.post('/verify', async (req, res) => {
 
     const ver = parseInt(cfg.lock_token_version, 10) || 1;
     const token = jwt.sign({ type: 'unlock', ver }, JWT_SECRET, { expiresIn: UNLOCK_TOKEN_EXPIRES });
-    res.json({ success: true, locked: true, token, idleTimeout: parseInt(cfg.lock_idle_timeout, 10) || 120 });
+    res.json({ success: true, locked: true, token, idleTimeout: parseInt(cfg.lock_idle_timeout, 10) || 300 });
   } catch (err) {
     console.error('锁屏校验失败:', err);
     res.status(500).json({ error: err.message });
@@ -135,7 +135,7 @@ router.post('/status', async (req, res) => {
       locked: cfg.lock_enabled === '1' && !!cfg.lock_password_hash,
       hasPassword: !!cfg.lock_password_hash,
       tokenValid,
-      idleTimeout: parseInt(cfg.lock_idle_timeout, 10) || 120
+      idleTimeout: parseInt(cfg.lock_idle_timeout, 10) || 300
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -145,6 +145,8 @@ router.post('/status', async (req, res) => {
 router.post('/config', auth, async (req, res) => {
   try {
     const cfg = await ensureLockDefaults();
+    const wasEnabled = cfg.lock_enabled === '1';
+    let passwordChanged = false;
     const { enabled, currentPassword, newPassword, idleTimeout } = req.body || {};
 
     if (newPassword !== undefined && newPassword !== null && newPassword !== '') {
@@ -162,12 +164,16 @@ router.post('/config', auth, async (req, res) => {
       }
       const hash = await bcrypt.hash(newPassword, 12);
       await setSetting('lock_password_hash', hash);
-      const ver = (parseInt(cfg.lock_token_version, 10) || 1) + 1;
-      await setSetting('lock_token_version', ver);
+      passwordChanged = true;
     }
 
     if (enabled !== undefined) {
       const wantEnable = enabled === true || enabled === '1' || enabled === 1;
+      if (wantEnable && !wasEnabled && !passwordChanged) {
+        // 开启动作本身也使所有设备的旧解锁令牌立即失效，所见即所得
+        const ver = (parseInt(cfg.lock_token_version, 10) || 1) + 1;
+        await setSetting('lock_token_version', ver);
+      }
       if (wantEnable) {
         const finalHash = await getSetting('lock_password_hash');
         if (!finalHash) {
@@ -175,7 +181,8 @@ router.post('/config', auth, async (req, res) => {
         }
       }
       await setSetting('lock_enabled', wantEnable ? '1' : '0');
-      if (!wantEnable) {
+      if (!wantEnable && wasEnabled) {
+        // 关闭锁屏时清除密码，回到全新安装状态
         const curHash = await getSetting('lock_password_hash');
         if (curHash) {
           await setSetting('lock_password_hash', '');
@@ -187,7 +194,7 @@ router.post('/config', auth, async (req, res) => {
 
     if (idleTimeout !== undefined) {
       let t = parseInt(idleTimeout, 10);
-      if (isNaN(t)) t = 120;
+      if (isNaN(t)) t = 300;
       t = Math.max(10, Math.min(86400, t));
       await setSetting('lock_idle_timeout', t);
     }
@@ -198,7 +205,7 @@ router.post('/config', auth, async (req, res) => {
       success: true,
       message: '锁屏设置已保存',
       lock_enabled: updated.lock_enabled,
-      idleTimeout: parseInt(updated.lock_idle_timeout, 10) || 120,
+      idleTimeout: parseInt(updated.lock_idle_timeout, 10) || 300,
       hasPassword: !!updated.lock_password_hash
     });
   } catch (err) {

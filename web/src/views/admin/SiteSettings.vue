@@ -153,7 +153,7 @@ const message = ref('');
 
 const lockForm = ref({
   enabled: false,
-  idleTimeout: 120,
+  idleTimeout: 300,
   currentPassword: '',
   newPassword: ''
 });
@@ -234,6 +234,16 @@ onMounted(async () => {
     const res = await getSettings();
     const data = res.data || {};
 
+    // 登录态却收到"匿名形态"数据（无任何 lock_ 字段）→ 令牌已过期，
+    // 不能用缺失数据污染表单，走重新登录流程
+    const hasToken = !!localStorage.getItem('token');
+    if (hasToken && data.lock_enabled === undefined) {
+      localStorage.removeItem('token');
+      sessionStorage.setItem('loginError', '登录已过期，请重新登录');
+      window.location.href = '/admin';
+      return;
+    }
+
     form.value.bg_url_pc = data.bg_url_pc || '';
     form.value.bg_url_mobile = data.bg_url_mobile || '';
     form.value.text_color_mode = data.text_color_mode || 'black';
@@ -248,7 +258,7 @@ onMounted(async () => {
 
     lockForm.value.enabled = data.lock_enabled === '1';
     const idleT = parseInt(data.lock_idle_timeout, 10);
-    lockForm.value.idleTimeout = isNaN(idleT) ? 120 : idleT;
+    lockForm.value.idleTimeout = isNaN(idleT) ? 300 : idleT;
 
     try {
       const statusRes = await getLockStatus();

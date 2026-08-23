@@ -79,12 +79,26 @@ async function handleUnlock() {
   try {
     const res = await verifyLockPassword(password.value);
     const data = res.data || {};
-    sessionStorage.setItem('unlock_token', data.token || '');
     password.value = '';
-    emit('unlocked', {
-      token: data.token,
-      idleTimeout: data.idleTimeout || 120
-    });
+
+    // 严格校验：仅当服务器确认"处于锁定态且验证通过并签发令牌"时才解锁
+    if (data.success && data.locked === true && data.token) {
+      sessionStorage.setItem('unlock_token', data.token);
+      emit('unlocked', {
+        token: data.token,
+        idleTimeout: data.idleTimeout || 300
+      });
+      return;
+    }
+
+    // HTTP 200 但服务器声明未锁定（锁屏已被关闭/清除）：
+    // 不能盲目解锁，通知父组件重新同步状态
+    if (data.locked === false) {
+      emit('unlocked', { serverUnlocked: true, idleTimeout: data.idleTimeout || 300 });
+      return;
+    }
+
+    errorMsg.value = '解锁失败，请稍后再试';
   } catch (e) {
     const msg = e.response && e.response.data && e.response.data.error;
     errorMsg.value = msg === 'lock_required' ? '密码错误' : (msg || '解锁失败，请稍后再试');

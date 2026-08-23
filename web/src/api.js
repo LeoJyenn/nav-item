@@ -74,6 +74,7 @@ axios.interceptors.response.use(
       document.getElementById('logout-confirm-btn').onclick = () => {
         document.body.removeChild(modal);
         showingLogoutAlert = false;
+        sessionStorage.setItem('loginError', '登录已过期，请重新登录');
         localStorage.removeItem('token');
         sessionStorage.removeItem('token');
         window.location.href = '/admin';
