@@ -25,6 +25,7 @@
           class="link-icon"
           :src="getLogo(card)"
           alt=""
+          @load="onImgLoad"
           @error="onImgError($event, card)"
           loading="lazy"
           decoding="async"
@@ -218,23 +219,43 @@ function handleClick(url) {
 }
 
 function getLogo(card) {
-  if (card.custom_logo_path) return '/uploads/' + card.custom_logo_path;
-  if (card.logo_url) return card.logo_url;
+  return faviconChain(card)[0];
+}
+
+// 图标来源优先级：自定义上传 → 手动logo → 高清favicon服务(国内可达64px+) → 站点自带favicon.ico → 默认图标
+function faviconChain(card) {
+  const chain = [];
+  if (card.custom_logo_path) chain.push('/uploads/' + card.custom_logo_path);
+  if (card.logo_url) chain.push(card.logo_url);
+  let host = '';
+  let origin = '';
   try {
-    const url = new URL(card.url);
-    return url.origin + '/favicon.ico';
-  } catch {
-    return '/icon.png';
-  }
+    const u = new URL(card.url);
+    host = u.hostname;
+    origin = u.origin;
+    chain.push('https://api.iowen.cn/favicon/' + host + '.png');
+    chain.push(origin + '/favicon.ico');
+  } catch {}
+  chain.push('/icon.png');
+  return chain;
+}
+
+function onImgLoad(e) {
+  e.target.dataset.chainIdx = '';
+  e.target.style.display = '';
 }
 
 function onImgError(e, card) {
-  if (e.target.dataset.fallbackApplied) {
-    e.target.style.display = 'none';
+  const img = e.target;
+  const idx = Number(img.dataset.chainIdx || 0) + 1;
+  const chain = faviconChain(card);
+  if (idx >= chain.length) {
+    img.dataset.chainIdx = '';
+    img.style.display = 'none';
     return;
   }
-  e.target.dataset.fallbackApplied = '1';
-  e.target.src = '/icon.png';
+  img.dataset.chainIdx = String(idx);
+  img.src = chain[idx];
 }
 
 function getTooltip(card) {
@@ -422,19 +443,23 @@ function truncate(str) {
 }
 
 .link-icon {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   margin: 4px auto;
   object-fit: contain;
   aspect-ratio: 1 / 1;
   display: block;
+  /* 统一视觉底板：不同来源/留白的图标都坐在同一块圆角瓷砖上 */
+  background: rgba(127, 127, 127, 0.16);
+  border-radius: 8px;
   transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.3s ease;
 }
 
 @media (max-width: 480px) {
   .link-icon {
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
   }
 }
 
