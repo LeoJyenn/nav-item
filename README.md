@@ -359,6 +359,36 @@ ls /opt/nav-item/data/jwt-secret.key   # 首次启动自动生成，无需 .env
 cd /opt/nav-item && tar -czf /root/nav-node_modules-backup.tgz node_modules
 ```
 
+##### 重装快速恢复（预编译依赖包）
+
+ARMv7 的完整依赖已打包发布在仓库 Releases（标签 `prebuilt-armv7-node20`，
+约 13MB）。重装设备时**可跳过步骤 2 工具链和步骤 4 漫长编译**：
+
+```bash
+# 前提：已按步骤 1 安装好 Node v20
+# 1) 获取代码（方式 A 或 B）
+# 2) 下载并解压预编译依赖
+wget https://github.com/LeoJyenn/nav-item/releases/download/prebuilt-armv7-node20/nav-modules-armv7-node20.tgz
+tar -xzf nav-modules-armv7-node20.tgz -C /opt/nav-item
+# 3) 验证（无需任何 npm install）
+node -e "require('/opt/nav-item/node_modules/sqlite3'); console.log('OK')"
+
+# 之后按步骤 6 创建 systemd 服务即可启动
+```
+
+⚠️ 该包绑定 **Node v20**（ABI 115）。升级 Node 大版本后需删除
+`node_modules` 按步骤 2/4 重新编译。
+
+✅ 包内仅含第三方开源库与编译产物，**不含任何用户数据**——每次使用它安装
+都是全新站点。如需迁移旧站数据，单独备份/恢复 `/opt/nav-item/data/` 目录即可。
+
+##### 重装备份清单
+
+| 内容 | 路径 | 说明 |
+|---|---|---|
+| 导航站全部数据 | `/opt/nav-item/data/` | 数据库、JWT 密钥、上传文件，一个目录全包含 |
+| 服务定义 | `/etc/systemd/system/nav-item.service` | 丢失可按本文步骤 6 原样重建 |
+
 ### 反向代理（可选）
 
 通过 Nginx / Nginx Proxy Manager 等反代时，请转发真实客户端 IP（`X-Forwarded-For`），服务端已启用 `trust proxy`，防爆破将按真实 IP 计数。
