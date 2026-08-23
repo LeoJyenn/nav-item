@@ -71,6 +71,43 @@ router.put('/password', authMiddleware, (req, res) => {
   });
 });
 
+// 修改用户名
+router.put('/username', authMiddleware, (req, res) => {
+  const { currentPassword, newUsername } = req.body;
+  const name = typeof newUsername === 'string' ? newUsername.trim() : '';
+
+  if (!currentPassword || !name) {
+    return res.status(400).json({ message: '请提供当前密码和新用户名' });
+  }
+  if (name.length < 2 || name.length > 20) {
+    return res.status(400).json({ message: '用户名长度需在 2-20 位之间' });
+  }
+
+  db.get('SELECT password FROM users WHERE id = ?', [req.user.id], (err, user) => {
+    if (err) return res.status(500).json({ message: '服务器错误' });
+    if (!user) return res.status(404).json({ message: '用户不存在' });
+    if (!bcrypt.compareSync(currentPassword, user.password)) {
+      return res.status(400).json({ message: '当前密码错误' });
+    }
+    db.get('SELECT id FROM users WHERE username = ? AND id != ?', [name, req.user.id], (err, dup) => {
+      if (err) return res.status(500).json({ message: '服务器错误' });
+      if (dup) return res.status(409).json({ message: '该用户名已被占用' });
+      db.run('UPDATE users SET username = ? WHERE id = ?', [name, req.user.id], (err) => {
+        if (err) return res.status(500).json({ message: '用户名修改失败' });
+        // 同步签发携带新用户名的令牌，旧令牌最长 2 小时后自然失效
+        const jwt = require('jsonwebtoken');
+        const config = require('../config');
+        const token = jwt.sign(
+          { id: req.user.id, username: name },
+          config.server.jwtSecret,
+          { expiresIn: '2h' }
+        );
+        res.json({ message: '用户名修改成功', token });
+      });
+    });
+  });
+});
+
 // 获取所有用户（管理员功能）
 router.get('/', authMiddleware, (req, res) => {
   const { page, pageSize } = req.query;

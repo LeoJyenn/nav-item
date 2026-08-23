@@ -9,6 +9,33 @@
     <div class="user-card">
       <div class="inner-card">
         <div class="password-section">
+          <h3 class="section-title">修改登录用户名</h3>
+          <p class="section-desc">当前用户名：{{ userInfo.username || '加载中...' }}，修改后请使用新用户名重新登录。</p>
+
+          <div class="password-form">
+            <div class="form-group">
+              <label>新用户名</label>
+              <input v-model="newUsername" type="text" placeholder="2-20 个字符" class="input" />
+            </div>
+
+            <div class="form-group">
+              <label>当前密码</label>
+              <input v-model="usernamePassword" type="password" placeholder="请输入当前密码以确认身份" class="input" />
+            </div>
+
+            <div class="form-actions">
+              <button @click="handleChangeUsername" class="btn" :disabled="loadingName">
+                {{ loadingName ? '修改中...' : '修改用户名' }}
+              </button>
+            </div>
+
+            <p v-if="nameMessage" :class="['message', nameMessageType]">
+              {{ nameMessage }}
+            </p>
+          </div>
+        </div>
+
+        <div class="password-section">
           <h3 class="section-title">修改登录密码</h3>
           <p class="section-desc">为保障账号安全，建议定期更换密码，并保证至少 6 位长度。</p>
 
@@ -46,7 +73,7 @@
 
 <script setup>
 import { ref, onMounted } from "vue";
-import { getUserProfile, changePassword } from "../../api";
+import { getUserProfile, changePassword, changeUsername } from "../../api";
 
 const oldPassword = ref("");
 const newPassword = ref("");
@@ -55,6 +82,12 @@ const loading = ref(false);
 const message = ref("");
 const messageType = ref("success");
 const userInfo = ref({});
+
+const newUsername = ref("");
+const usernamePassword = ref("");
+const loadingName = ref(false);
+const nameMessage = ref("");
+const nameMessageType = ref("success");
 
 onMounted(async () => {
   try {
@@ -109,6 +142,50 @@ function showMessage(text, type) {
     }, 500);
   } else {
     setTimeout(() => (message.value = ""), 3000);
+  }
+}
+
+async function handleChangeUsername() {
+  const name = newUsername.value.trim();
+  if (!name || !usernamePassword.value) {
+    showNameMessage("请填写新用户名和当前密码", "error");
+    return;
+  }
+  if (name.length < 2 || name.length > 20) {
+    showNameMessage("用户名长度需在 2-20 位之间", "error");
+    return;
+  }
+
+  loadingName.value = true;
+  nameMessage.value = "";
+
+  try {
+    await changeUsername(usernamePassword.value, name);
+    userInfo.value.username = name;
+    showNameMessage("用户名修改成功", "success");
+    newUsername.value = "";
+    usernamePassword.value = "";
+  } catch (error) {
+    showNameMessage(error.response?.data?.message || "用户名修改失败", "error");
+  } finally {
+    loadingName.value = false;
+  }
+}
+
+function showNameMessage(text, type) {
+  nameMessage.value = text;
+  nameMessageType.value = type;
+
+  if (text === "用户名修改成功" && type === "success") {
+    setTimeout(() => {
+      nameMessage.value = "2 秒后自动退出登录，请使用新用户名重新登录...";
+      setTimeout(() => {
+        localStorage.removeItem("token");
+        window.location.reload();
+      }, 2000);
+    }, 500);
+  } else {
+    setTimeout(() => (nameMessage.value = ""), 3000);
   }
 }
 </script>

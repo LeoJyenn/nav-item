@@ -180,6 +180,12 @@ export const changePassword = (oldPassword, newPassword) =>
     { oldPassword, newPassword },
     { headers: authHeaders() }
   );
+export const changeUsername = (currentPassword, newUsername) =>
+  axios.put(
+    `${BASE}/users/username`,
+    { currentPassword, newUsername },
+    { headers: authHeaders() }
+  );
 export const getUsers = () =>
   axios.get(`${BASE}/users`, { headers: authHeaders() });
 
