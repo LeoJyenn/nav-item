@@ -92,7 +92,8 @@ const nameMessageType = ref("success");
 onMounted(async () => {
   try {
     const response = await getUserProfile();
-    userInfo.value = response.data;
+    // 后端返回结构为 { data: { id, username } }，需取内层 data
+    userInfo.value = response.data?.data ?? {};
   } catch (e) {}
 });
 
