@@ -366,8 +366,14 @@ ARMv7 的完整依赖已打包发布在仓库 Releases（标签 `prebuilt-armv7-
 
 ```bash
 # 前提：已按步骤 1 安装好 Node v20
-# 1) 获取代码（方式 A 或 B）
-# 2) 下载并解压预编译依赖（国内网络建议用带重试和断点续传的方式）
+# 完整恢复需要两个包：① 代码包（程序+前端）② 依赖包（node_modules）
+
+# ① 先获取代码——得到 app.js、routes/、web/dist/ 等程序文件（任选其一）
+git clone --depth 1 https://github.com/LeoJyenn/nav-item.git /opt/nav-item
+#   或使用方式 B：解压 PC 上传的 navitem-deploy.tgz 到 /opt/nav-item
+
+# ② 再补依赖（替代步骤 4 的 npm install，零编译）——得到 node_modules/
+cd /opt/nav-item
 curl -sL --retry 3 -C - -o nav-modules-armv7-node20.tgz \
   https://github.com/LeoJyenn/nav-item/releases/download/prebuilt-armv7-node20/nav-modules-armv7-node20.tgz
 
@@ -377,8 +383,10 @@ sha256sum nav-modules-armv7-node20.tgz
 # 应为: AB506779F8CCD0CF1C29A87A6BC9027D5B9AB530743B43BB8B0A25B7EFABDF12
 
 tar -xzf nav-modules-armv7-node20.tgz -C /opt/nav-item
-# 3) 验证（无需任何 npm install）
-node -e "require('/opt/nav-item/node_modules/sqlite3'); console.log('OK')"
+
+# ③ 验证两个包都已就位
+node --check /opt/nav-item/app.js && echo '代码包 OK'
+node -e "require('/opt/nav-item/node_modules/sqlite3'); console.log('依赖包 OK')"
 ```
 
 > 若设备直连 GitHub 下载反复失败：在 PC 浏览器下载该文件后再
