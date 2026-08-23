@@ -5,8 +5,6 @@ body,
   padding: 0;
   background: #ffffff;
   color: #000000;
-  /* 禁用 iOS 过滚动回弹：防止页面内容不满一屏时回弹露出 body 白底 */
-  overscroll-behavior-y: none;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -18,9 +16,20 @@ body,
   }
 }
 
-/* ===== iOS WebApp 灵动岛/安全区沉浸式（玻璃条本体在 Home.vue 内，继承玻璃变量）===== */
+/* ===== iOS WebApp 灵动岛/安全区沉浸式 =====
+   安全区偏移由 .home-container 内部处理（壁纸层 fixed 全屏，不受文档流影响）。
+   此处仅两件事：
+   1) 原生回弹越界时露出深色底（与壁纸暗部融合，替代刺眼白条）
+   2) standalone 模式隐藏滚动条 */
 body.ios-standalone {
-  padding-top: env(safe-area-inset-top);
-  /* 兜底：个别 WebView 不支持 overscroll 限制时，回弹露出的也是深色而非白边 */
   background: #000000;
+}
+
+html:has(body.ios-standalone) {
+  background: #000000;
+  scrollbar-width: none;
+}
+
+html:has(body.ios-standalone)::-webkit-scrollbar {
+  display: none;
 }
