@@ -55,7 +55,10 @@ const storage = multer.diskStorage({
   }
 });
 
-const fileUpload = multer({ storage });
+const fileUpload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 }
+});
 
 router.post('/', fileUpload.single('logo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });

@@ -18,7 +18,11 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 const dbPath = path.join(dbDir, 'nav.db');
 
-const upload = multer({ dest: path.join(__dirname, '../temp') });
+const upload = multer({
+  dest: path.join(__dirname, '../temp'),
+  limits: { fileSize: 500 * 1024 * 1024 }
+});
+const logger = require('../logger');
 
 function copyDirSync(src, dest) {
   if (!fs.existsSync(src)) return;
@@ -58,6 +62,7 @@ function clearDirSync(dir) {
 
 router.get('/export', async (req, res) => {
   try {
+    logger.logSecurity('BACKUP_EXPORT', req);
     const backupName = `backup_${Date.now()}.zip`;
     const tempDir = path.join(__dirname, '../temp');
     const tempPath = path.join(tempDir, backupName);
@@ -119,6 +124,7 @@ router.post('/import', upload.any(), async (req, res) => {
   let extractRoot = null;
 
   try {
+    logger.logSecurity('BACKUP_IMPORT', req);
     const file = req.files[0];
 
     const ext = path.extname(file.originalname);

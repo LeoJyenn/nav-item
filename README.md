@@ -65,6 +65,7 @@ nav-item/
 │   ├── database/nav.db    # SQLite 数据库
 │   ├── jwt-secret.key     # 自动生成的 JWT 密钥（首次启动创建）
 │   └── uploads/           # 上传文件目录
+├── logs/                  # 运行日志（access.log 访问日志 / security.log 安全事件）
 ├── routes/                # 后端路由
 │   ├── auth.js            # 管理员认证（含登录防爆破）
 │   ├── authMiddleware.js  # 管理员鉴权中间件
@@ -181,6 +182,85 @@ services:
 ### 反向代理（可选）
 
 通过 Nginx / Nginx Proxy Manager 等反代时，请转发真实客户端 IP（`X-Forwarded-For`），服务端已启用 `trust proxy`，防爆破将按真实 IP 计数。
+
+### 🏆 推荐生产部署架构（公网使用）
+
+推荐「**Docker Compose + 反向代理 + HTTPS**」的组合，应用端口不直接暴露公网：
+
+```
+用户 → NPM/Nginx (80/443, HTTPS) → 容器内 3000 端口
+```
+
+#### 步骤一：编写 docker-compose.yml
+
+```yaml
+version: '3'
+
+services:
+  nav-item:
+    image: leojyenn/nav-item:latest
+    container_name: nav-item
+    ports:
+      - "127.0.0.1:3000:3000"   # 只绑定本机回环，外网无法直连
+    volumes:
+      - ./data:/app/data        # 数据库 + JWT密钥 + 上传文件 + 日志 全部持久化
+    restart: unless-stopped
+```
+
+启动：`docker compose up -d`
+
+> 关键点：端口映射写成 `127.0.0.1:3000:3000`，配合防火墙只放行 80/443，应用本身永不直接暴露。
+
+#### 步骤二：配置反向代理与 HTTPS
+
+以 Nginx Proxy Manager 为例：
+
+1. 添加 Proxy Host：域名指向 `127.0.0.1`，端口 `3000`
+2. SSL 标签页申请 Let's Encrypt 证书，开启 Force HTTPS
+3. NPM 默认会带上 `X-Forwarded-For`，无需额外配置
+
+纯 Nginx 配置参考：
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name your-domain.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        client_max_body_size 500m;   # 与备份导入上限一致
+    }
+}
+```
+
+#### 步骤三：首次上线检查清单
+
+- [ ] 登录后台修改默认密码（勿用弱密码，建议 12 位以上混合字符）
+- [ ] 在「外观设置」中开启锁屏并设置锁屏密码
+- [ ] 确认 `data/` 目录已挂载持久化（含数据库、JWT 密钥、上传文件）
+- [ ] 防火墙/安全组只开放 80 和 443
+
+## 📋 日志说明
+
+服务运行后会在 `logs/` 目录生成两类日志（Docker 部署时随 `data` 同级目录持久化）：
+
+| 文件 | 内容 |
+|---|---|
+| `logs/access.log` | 全部 HTTP 访问记录（时间、IP、方法、路径、状态码、UA） |
+| `logs/security.log` | 安全事件：登录成功/失败/限流、解锁成功/失败/限流、备份导出导入 |
+
+安全日志示例：
+
+```
+[2026-08-23 15:11:43] LOGIN_FAILED IP=1.2.3.4 | username=admin reason=wrong_password
+[2026-08-23 15:12:10] LOCK_RATE_LIMITED IP=5.6.7.8
+[2026-08-23 15:15:02] BACKUP_EXPORT IP=1.2.3.4
+```
+
+可据此配置 fail2ban 或定期巡检异常来源 IP。
 
 ## ❓ 常见问题
 

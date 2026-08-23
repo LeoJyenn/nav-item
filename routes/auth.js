@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const router = express.Router();
 const config = require('../config');
+const logger = require('../logger');
 
 const JWT_SECRET = config.server.jwtSecret;
 
@@ -39,13 +40,6 @@ function recordLoginFailure(ip) {
   entry.count++;
 }
 
-function getClientIp(req) {
-  let ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || '';
-  if (typeof ip === 'string' && ip.includes(',')) ip = ip.split(',')[0].trim();
-  if (typeof ip === 'string' && ip.startsWith('::ffff:')) ip = ip.replace('::ffff:', '');
-  return ip;
-}
-
 function getShanghaiTime() {
   const date = new Date();
   // 获取上海时区时间
@@ -65,17 +59,20 @@ function getShanghaiTime() {
 router.post('/login', (req, res) => {
   const ip = getClientIp(req);
   if (isLoginBlocked(ip)) {
+    logger.logSecurity('LOGIN_RATE_LIMITED', req, `username=${(req.body && req.body.username) || ''}`);
     return res.status(429).json({ error: '尝试次数过多，请15分钟后再试' });
   }
   const { username, password } = req.body;
   db.get('SELECT * FROM users WHERE username=?', [username], (err, user) => {
     if (err || !user) {
       recordLoginFailure(ip);
+      logger.logSecurity('LOGIN_FAILED', req, `username=${username || ''} reason=user_not_found`);
       return res.status(401).json({ error: '用户名或密码错误' });
     }
     bcrypt.compare(password, user.password, (err, result) => {
       if (result) {
         loginAttempts.delete(ip);
+        logger.logSecurity('LOGIN_SUCCESS', req, `username=${username}`);
         // 透明升级：旧轮数哈希在成功验证后用新轮数重写
         const roundsMatch = /\$2[aby]\$(\d+)\$/.exec(user.password);
         const currentRounds = roundsMatch ? parseInt(roundsMatch[1], 10) : BCRYPT_ROUNDS;
@@ -97,6 +94,7 @@ router.post('/login', (req, res) => {
         res.json({ token, lastLoginTime, lastLoginIp });
       } else {
         recordLoginFailure(ip);
+        logger.logSecurity('LOGIN_FAILED', req, `username=${username || ''} reason=wrong_password`);
         res.status(401).json({ error: '用户名或密码错误' });
       }
     });

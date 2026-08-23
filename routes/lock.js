@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const auth = require('./authMiddleware');
 const { invalidateLockStateCache } = require('./lockMiddleware');
 const config = require('../config');
+const logger = require('../logger');
 
 const JWT_SECRET = config.server.jwtSecret;
 const UNLOCK_TOKEN_EXPIRES = '12h';
@@ -86,6 +87,7 @@ router.post('/verify', async (req, res) => {
 
     const ip = getClientIp(req);
     if (isRateLimited(ip)) {
+      logger.logSecurity('LOCK_RATE_LIMITED', req);
       return res.status(429).json({ error: '尝试次数过多，请稍后再试' });
     }
 
@@ -97,10 +99,12 @@ router.post('/verify', async (req, res) => {
     const ok = await bcrypt.compare(password, cfg.lock_password_hash).catch(() => false);
     if (!ok) {
       recordFailedAttempt(ip);
+      logger.logSecurity('LOCK_UNLOCK_FAILED', req);
       return res.status(401).json({ error: '密码错误' });
     }
 
     verifyAttempts.delete(ip);
+    logger.logSecurity('LOCK_UNLOCK_SUCCESS', req);
 
     const ver = parseInt(cfg.lock_token_version, 10) || 1;
     const token = jwt.sign({ type: 'unlock', ver }, JWT_SECRET, { expiresIn: UNLOCK_TOKEN_EXPIRES });
