@@ -61,6 +61,10 @@ app.use((err, req, res, next) => {
   if (err && err.code === 'LIMIT_FILE_SIZE') {
     return res.status(413).json({ error: '文件超过大小限制' });
   }
+  if (err && (err.statusCode || err.status)) {
+    // body-parser 等中间件的客户端错误（如非法 JSON），按其真实状态码返回
+    return res.status(err.statusCode || err.status).json({ error: '请求格式错误' });
+  }
   console.error(err);
   res.status(500).json({ error: '服务器内部错误' });
 });
