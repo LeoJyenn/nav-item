@@ -367,14 +367,22 @@ ARMv7 的完整依赖已打包发布在仓库 Releases（标签 `prebuilt-armv7-
 ```bash
 # 前提：已按步骤 1 安装好 Node v20
 # 1) 获取代码（方式 A 或 B）
-# 2) 下载并解压预编译依赖
-wget https://github.com/LeoJyenn/nav-item/releases/download/prebuilt-armv7-node20/nav-modules-armv7-node20.tgz
+# 2) 下载并解压预编译依赖（国内网络建议用带重试和断点续传的方式）
+curl -sL --retry 3 -C - -o nav-modules-armv7-node20.tgz \
+  https://github.com/LeoJyenn/nav-item/releases/download/prebuilt-armv7-node20/nav-modules-armv7-node20.tgz
+
+# 校验完整性（正确大小应为 12996156 字节；SHA256 如下，大小写不敏感）
+ls -l nav-modules-armv7-node20.tgz
+sha256sum nav-modules-armv7-node20.tgz
+# 应为: AB506779F8CCD0CF1C29A87A6BC9027D5B9AB530743B43BB8B0A25B7EFABDF12
+
 tar -xzf nav-modules-armv7-node20.tgz -C /opt/nav-item
 # 3) 验证（无需任何 npm install）
 node -e "require('/opt/nav-item/node_modules/sqlite3'); console.log('OK')"
-
-# 之后按步骤 6 创建 systemd 服务即可启动
 ```
+
+> 若设备直连 GitHub 下载反复失败：在 PC 浏览器下载该文件后再
+> `scp` 上传到设备即可（PC 端实测可正常访问）。
 
 ⚠️ 该包绑定 **Node v20**（ABI 115）。升级 Node 大版本后需删除
 `node_modules` 按步骤 2/4 重新编译。
