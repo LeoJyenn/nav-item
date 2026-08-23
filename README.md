@@ -179,6 +179,186 @@ services:
 - `leojyenn/nav-item:latest`
 - `ghcr.io/leojyenn/nav-item:latest`
 
+### ARM 设备 / 低配设备裸机部署（详细版）
+
+适用于 ARMv7 盒子（海纳思、N1、各种电视盒刷的 NAS 系统）或内存 < 1GB 的设备。
+这类设备不建议 Docker 部署：官方镜像无 armv7 变体、前端构建工具 esbuild 不支持
+armv7、原生模块在模拟器中编译极慢——裸机直跑是最优解。
+
+> 以下命令基于 Debian/Ubuntu 系设备，其他发行版请自行替换包管理器。
+> 示例假设所有操作以 root 执行；PC 端为 Windows 10/11（自带 tar 和 ssh）。
+
+#### 步骤 1：安装 Node.js 20（armv7 二进制包）
+
+Ubuntu 自带源的 Node 版本过老（v10），直接用官方二进制包：
+
+```bash
+# 国内设备优先用 npmmirror 镜像下载，失败自动回退官方源
+cd /tmp
+wget -q https://registry.npmmirror.com/-/binary/node/v20.18.1/node-v20.18.1-linux-armv7l.tar.xz -O node.tar.xz \
+  || wget -q https://nodejs.org/dist/v20.18.1/node-v20.18.1-linux-armv7l.tar.xz -O node.tar.xz
+
+mkdir -p /opt/node20
+tar -xJf node.tar.xz -C /opt/node20 --strip-components=1
+ln -sf /opt/node20/bin/node /usr/local/bin/node
+ln -sf /opt/node20/bin/npm  /usr/local/bin/npm
+ln -sf /opt/node20/bin/npx  /usr/local/bin/npx
+
+# 验证
+node -v   # 应输出 v20.18.1
+npm -v    # 应输出 v10.x.x
+```
+
+#### 步骤 2：安装编译工具链
+
+sqlite3 是原生模块，ARMv7 平台没有预编译包，必须在设备上现场编译：
+
+```bash
+apt update
+apt install -y build-essential python3 git xz-utils curl ca-certificates
+
+gcc --version   # 验证 gcc 已就绪
+```
+
+#### 步骤 3：获取代码
+
+**方式 A：git clone（设备可正常访问 GitHub 时）**
+
+```bash
+git clone --depth 1 https://github.com/LeoJyenn/nav-item.git /opt/nav-item
+```
+
+**方式 B：PC 打包上传（国内网络推荐，实测更稳）**
+
+在 PC 上进入项目目录执行：
+
+```powershell
+# Windows PowerShell：先构建最新前端（见步骤 5），再打包后端代码与前端产物
+tar -czf navitem-deploy.tgz app.js config.js db.js logger.js package.json package-lock.json routes web/dist
+scp navitem-deploy.tgz root@设备IP:/tmp/
+```
+
+设备上解压：
+
+```bash
+rm -rf /opt/nav-item
+mkdir -p /opt/nav-item
+tar -xzf /tmp/navitem-deploy.tgz -C /opt/nav-item
+ls /opt/nav-item       # 应看到 app.js routes web 等文件
+```
+
+#### 步骤 4：安装后端依赖
+
+```bash
+cd /opt/nav-item
+npm config set registry https://registry.npmmirror.com   # 国内加速
+npm install --omit=dev
+```
+
+⚠️ **这一步可能卡住 10~20 分钟，属正常现象**——sqlite3 正在你的设备上
+从 C++ 源码现场编译（ARMv7 没有预编译包）。可以用另一个终端观察进度：
+
+```bash
+ls /opt/nav-item/node_modules | wc -l          # 包数量持续增长说明在干活
+ls /opt/nav-item/node_modules/sqlite3/build/Release/*.node   # 出现 .node 文件即编译完成
+```
+
+完成后验证：
+
+```bash
+node -e "require('sqlite3'); console.log('sqlite3 OK')"
+node -e "require('bcryptjs').hashSync('x',12); console.log('bcryptjs OK')"
+```
+
+#### 步骤 5：前端构建与上传（永远在 PC 上完成！）
+
+**不要在盒子上运行 `npm run build`**——esbuild 没有 armv7 版本，
+且 Vite 构建需要约 500MB 内存，低配设备扛不住。
+
+PC 上（PowerShell）：
+
+```powershell
+cd web
+npm install        # 首次需要
+npm run build      # 产物在 web/dist/
+cd ..
+tar -czf dist.tgz -C web dist
+scp dist.tgz root@设备IP:/tmp/
+```
+
+盒子上解压：
+
+```bash
+mkdir -p /opt/nav-item/web && tar -xzf /tmp/dist.tgz -C /opt/nav-item/web
+```
+
+#### 步骤 6：创建 systemd 服务（开机自启 + 崩溃自动重启）
+
+```bash
+cat > /etc/systemd/system/nav-item.service <<'EOF'
+[Unit]
+Description=Nav-item navigation site
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/nav-item
+ExecStart=/usr/local/bin/node app.js
+Environment=PORT=3010
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now nav-item
+```
+
+端口说明：默认示例用 **3010**。如果你的 3000 端口已被占用
+（例如 nginx-proxy-manager 容器会占用宿主机 3000），换任意空闲端口即可，
+改 `Environment=PORT=` 一行。
+
+#### 步骤 7：验证
+
+```bash
+systemctl is-active nav-item        # 应输出 active
+ss -tlnp | grep 3010                # 应看到 node 进程监听
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3010     # 200
+curl -s http://127.0.0.1:3010/api/menus                            # 返回 JSON
+ls /opt/nav-item/data/jwt-secret.key   # 首次启动自动生成，无需 .env
+```
+
+浏览器访问 `http://设备IP:3010`，后台 `/admin`，默认账号 `admin / 123456`。
+
+⚠️ **首次上线必做**：立即修改默认管理员密码，并在「外观设置」中开启锁屏。
+
+#### 数据与备份
+
+运行产生的全部数据都在一个目录里，备份即拷贝：
+
+```
+/opt/nav-item/data/
+├── database/nav.db    # SQLite 数据库（菜单/卡片/设置/密码）
+├── jwt-secret.key     # 自动生成的登录密钥
+└── uploads/           # 上传的图标、视频背景等
+```
+
+#### 日常更新流程
+
+| 场景 | 操作 |
+|---|---|
+| 只改了代码/样式 | PC 构建前端 → 上传覆盖 `web/dist` → `systemctl restart nav-item`（秒级完成） |
+| 只改了后端 JS | 上传对应 `.js` 文件 → 重启服务 |
+| 升级了依赖版本 | 才需要重新 `npm install`（可能触发再次编译） |
+
+建议备份一份装好的依赖目录，重装系统时可跳过漫长编译：
+
+```bash
+cd /opt/nav-item && tar -czf /root/nav-node_modules-backup.tgz node_modules
+```
+
 ### 反向代理（可选）
 
 通过 Nginx / Nginx Proxy Manager 等反代时，请转发真实客户端 IP（`X-Forwarded-For`），服务端已启用 `trust proxy`，防爆破将按真实 IP 计数。
@@ -272,6 +452,9 @@ A: 删除 `data/database/nav.db` 会重置整个站点数据（不推荐）。�
 
 **Q: 锁屏密码和管理员密码是一回事吗？**
 A: 不是。管理员密码用于后台 `/admin` 登录；锁屏密码用于前台解锁，两者独立设置，均可抵御暴力破解。
+
+**Q: ARM 设备上 `npm run build` 报错 esbuild 找不到？**
+A: esbuild 官方不提供 armv7 版本，前端无法在盒子上构建。请在 PC 上执行 `npm run build` 后把 `web/dist` 上传到设备，详见「ARM 设备 / 低配设备裸机部署」步骤 5。
 
 ## 🤝 贡献指南
 
