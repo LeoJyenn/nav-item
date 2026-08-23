@@ -599,11 +599,13 @@ async function resetLockIdleTimer() {
   if (isLocked.value) return;
   lockIdleTimer = setTimeout(async () => {
     try {
-      // 空闲触发时先向服务器确认真实锁屏状态，避免幽灵锁屏
+      // 空闲触发时向服务器确认锁屏是否仍处于启用状态；
+      // 注意：这里不检查 tokenValid —— 空闲超时就应当重新锁定，
+      // 长效解锁令牌仅用于页面刷新时免输密码
       const res = await getLockStatus();
       const st = res.data || {};
-      if (!st.locked || st.tokenValid) {
-        // 未启用锁 或 本设备令牌仍有效：保持解锁并重新计时
+      if (!st.locked) {
+        // 服务器端已关闭/清除锁屏：保持解锁并重新计时
         resetLockIdleTimer();
         return;
       }
