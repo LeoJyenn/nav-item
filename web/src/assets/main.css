@@ -16,26 +16,7 @@ body,
   }
 }
 
-/* ===== iOS WebApp 灵动岛/安全区沉浸式玻璃条（复刻 KVideo）===== */
-.status-bar-glass {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: env(safe-area-inset-top);
-  pointer-events: none;
-  z-index: 2500; /* 高于菜单栏(100)，保证刘海/灵动岛区域也有磨砂覆盖 */
-  background: transparent;
-  backdrop-filter: blur(8px) saturate(110%);
-  -webkit-backdrop-filter: blur(8px) saturate(110%);
-  opacity: 0;
-  transition: opacity 200ms ease-out;
-}
-
-body.ios-standalone .status-bar-glass {
-  opacity: 1;
-}
-
+/* ===== iOS WebApp 灵动岛/安全区沉浸式（玻璃条本体在 Home.vue 内，继承玻璃变量）===== */
 body.ios-standalone {
   padding-top: env(safe-area-inset-top);
 }
