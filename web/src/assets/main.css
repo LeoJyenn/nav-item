@@ -5,6 +5,8 @@ body,
   padding: 0;
   background: #ffffff;
   color: #000000;
+  /* 禁用 iOS 过滚动回弹：防止页面内容不满一屏时回弹露出 body 白底 */
+  overscroll-behavior-y: none;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,4 +21,6 @@ body,
 /* ===== iOS WebApp 灵动岛/安全区沉浸式（玻璃条本体在 Home.vue 内，继承玻璃变量）===== */
 body.ios-standalone {
   padding-top: env(safe-area-inset-top);
+  /* 兜底：个别 WebView 不支持 overscroll 限制时，回弹露出的也是深色而非白边 */
+  background: #000000;
 }
