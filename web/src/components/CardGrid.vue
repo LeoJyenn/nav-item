@@ -31,7 +31,7 @@
           fetchpriority="low"
         >
         <span class="link-text">{{ truncate(card.title) }}</span>
-        <span v-if="getDesc(card)" class="link-desc">{{ getDesc(card) }}</span>
+        <span class="link-desc">{{ getDesc(card) }}</span>
       </a>
     </div>
     <div
