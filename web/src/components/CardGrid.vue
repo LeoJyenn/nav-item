@@ -31,7 +31,7 @@
           fetchpriority="low"
         >
         <span class="link-text">{{ truncate(card.title) }}</span>
-        <span class="link-desc">{{ getDesc(card) }}</span>
+        <span v-if="getDesc(card)" class="link-desc">{{ getDesc(card) }}</span>
       </a>
     </div>
     <div
@@ -251,8 +251,8 @@ function getCardsSignature(list) {
 }
 
 function getDesc(card) {
-  if (!card) return '暂无描述';
-  return card.desc || '暂无描述';
+  if (!card || !card.desc) return '';
+  return String(card.desc).trim();
 }
 
 function truncate(str) {
