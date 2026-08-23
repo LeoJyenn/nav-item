@@ -584,14 +584,14 @@ function onUnlocked(payload) {
   if (payload && payload.idleTimeout) {
     lockIdleTimeout.value = payload.idleTimeout;
   }
-  if (payload && payload.serverUnlocked) {
-    // 服务器端锁屏已被关闭/清除：保持解锁，空闲计时继续轮询状态
-    resetLockIdleTimer();
+  if (menus.value.length > 0) {
+    // 锁屏期间菜单/广告已加载在内存：解锁后只补拉受保护的卡片数据，
+    // 省去公网环境下的两个重复往返
+    loadCards();
+  } else {
     loadInitialData();
-    return;
   }
   resetLockIdleTimer();
-  loadInitialData();
 }
 
 async function resetLockIdleTimer() {
