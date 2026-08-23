@@ -8,8 +8,6 @@
     @touchmove="onTouchMove"
     @touchend="onTouchEnd"
   >
-    <!-- 灵动岛/安全区玻璃条：与菜单栏使用同一套玻璃变量与滤镜，视觉无缝 -->
-    <div class="status-bar-glass" aria-hidden="true"></div>
     <video
       v-if="!isMobile && showVideoBgPc"
       ref="bgVideoPc"
@@ -993,7 +991,8 @@ function onTouchEnd() {
 
 .menu-bar-fixed {
   position: fixed;
-  top: env(safe-area-inset-top);
+  top: 0;
+  padding-top: env(safe-area-inset-top);
   left: 0;
   right: 0;
   width: 100%;
@@ -1008,19 +1007,6 @@ function onTouchEnd() {
   box-shadow: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.18);
   transition: background-color 0.3s ease;
-}
-
-.status-bar-glass {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: env(safe-area-inset-top);
-  z-index: 101; /* 略高于菜单栏，覆盖安全区；参数与菜单栏完全一致 → 无缝 */
-  pointer-events: none;
-  backdrop-filter: var(--glass-menu-filter, blur(10px));
-  -webkit-backdrop-filter: var(--glass-menu-filter, blur(10px));
-  background-color: rgba(var(--glass-color-rgb), var(--glass-opacity));
 }
 
 .search-container {
