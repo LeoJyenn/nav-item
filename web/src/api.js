@@ -140,7 +140,10 @@ export function fileUpload(file, remark, onUploadProgress) {
   formData.append('logo', file);
   formData.append('remark', remark || '');
   return axios.post('/api/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    headers: {
+      ...authHeaders(),
+      'Content-Type': 'multipart/form-data'
+    },
     onUploadProgress
   });
 }
@@ -165,7 +168,7 @@ export const updateAd = (id, data) =>
 export const deleteAd = (id) =>
   axios.delete(`${BASE}/ads/${id}`, { headers: authHeaders() });
 
-export const getFriends = () => axios.get(`${BASE}/friends`);
+export const getFriends = () => axios.get(`${BASE}/friends`, { headers: authHeaders() });
 export const addFriend = (data) =>
   axios.post(`${BASE}/friends`, data, { headers: authHeaders() });
 export const updateFriend = (id, data) =>
