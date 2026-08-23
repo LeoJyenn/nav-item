@@ -222,7 +222,7 @@ function getLogo(card) {
   return faviconChain(card)[0];
 }
 
-// 图标来源优先级：自定义上传 → 手动logo → 高清favicon服务(国内可达64px+) → 站点自带favicon.ico → 默认图标
+// 图标来源优先级：自定义上传 → 手动logo → DuckDuckGo高清(64px+) → favicon.im → 站点自带favicon.ico → 默认图标
 function faviconChain(card) {
   const chain = [];
   if (card.custom_logo_path) chain.push('/uploads/' + card.custom_logo_path);
@@ -233,7 +233,8 @@ function faviconChain(card) {
     const u = new URL(card.url);
     host = u.hostname;
     origin = u.origin;
-    chain.push('https://api.iowen.cn/favicon/' + host + '.png');
+    chain.push('https://icons.duckduckgo.com/ip3/' + host + '.ico');
+    chain.push('https://favicon.im/' + host + '?larger=true');
     chain.push(origin + '/favicon.ico');
   } catch {}
   chain.push('/icon.png');
