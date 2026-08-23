@@ -928,8 +928,6 @@ function onTouchEnd() {
   flex-direction: column;
   position: relative;
   padding-top: 50px;
-  /* 底部安全区：最后一张卡片不被 Home 指示条遮挡 */
-  padding-bottom: env(safe-area-inset-bottom);
   isolation: isolate;
   color: var(--global-text-color, #000);
   user-select: none;
