@@ -522,32 +522,31 @@ onMounted(async () => {
     console.error("加载网站设置失败:", settingsRes.reason);
   }
 
-  const lockEnabled = settings.value.lock_enabled === '1';
-  if (lockEnabled) {
-    lockIdleTimeout.value = parseInt(settings.value.lock_idle_timeout, 10) || 300;
-    try {
-      const statusRes = await getLockStatus();
-      const status = statusRes.data || {};
-      if (status.locked && !status.tokenValid) {
-        sessionStorage.removeItem('unlock_token');
-        cards.value = [];
-        isLocked.value = true;
-        // 菜单结构与广告为公开数据，锁屏期间正常展示；卡片保持隐藏
-        if (menusRes.status === 'fulfilled') {
-          menus.value = menusRes.value.data;
-          await nextTick();
-          measureMenuBar();
-        }
-        if (adsRes.status === 'fulfilled') {
-          leftAds.value = adsRes.value.data.filter(ad => ad.position === 'left');
-          rightAds.value = adsRes.value.data.filter(ad => ad.position === 'right');
-        }
-        startLockIdleTimer();
-        return;
+  // 锁屏判断走专用的 /api/lock/status（匿名可用），
+  // 不依赖 settings 接口——匿名响应已剥离 lock 字段
+  try {
+    const statusRes = await getLockStatus();
+    const status = statusRes.data || {};
+    if (status.locked && !status.tokenValid) {
+      lockIdleTimeout.value = parseInt(status.idleTimeout, 10) || 300;
+      sessionStorage.removeItem('unlock_token');
+      cards.value = [];
+      isLocked.value = true;
+      // 菜单结构与广告为公开数据，锁屏期间正常展示；卡片保持隐藏
+      if (menusRes.status === 'fulfilled') {
+        menus.value = menusRes.value.data;
+        await nextTick();
+        measureMenuBar();
       }
-    } catch (e) {
-      console.error("检查锁屏状态失败:", e);
+      if (adsRes.status === 'fulfilled') {
+        leftAds.value = adsRes.value.data.filter(ad => ad.position === 'left');
+        rightAds.value = adsRes.value.data.filter(ad => ad.position === 'right');
+      }
+      startLockIdleTimer();
+      return;
     }
+  } catch (e) {
+    console.error("检查锁屏状态失败:", e);
   }
 
   startLockIdleTimer();
