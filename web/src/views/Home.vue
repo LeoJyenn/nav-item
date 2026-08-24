@@ -530,18 +530,9 @@ onMounted(async () => {
     if (status.locked && !status.tokenValid) {
       lockIdleTimeout.value = parseInt(status.idleTimeout, 10) || 300;
       sessionStorage.removeItem('unlock_token');
-      cards.value = [];
       isLocked.value = true;
-      // 菜单结构与广告为公开数据，锁屏期间正常展示；卡片保持隐藏
-      if (menusRes.status === 'fulfilled') {
-        menus.value = menusRes.value.data;
-        await nextTick();
-        measureMenuBar();
-      }
-      if (adsRes.status === 'fulfilled') {
-        leftAds.value = adsRes.value.data.filter(ad => ad.position === 'left');
-        rightAds.value = adsRes.value.data.filter(ad => ad.position === 'right');
-      }
+      // 锁屏不隐藏内容：菜单、广告与卡片照常加载展示，锁屏组件仅作为覆盖层
+      await loadInitialData(menusRes, adsRes);
       startLockIdleTimer();
       return;
     }
@@ -618,7 +609,6 @@ async function resetLockIdleTimer() {
       return;
     }
     sessionStorage.removeItem('unlock_token');
-    cards.value = [];
     isLocked.value = true;
   }, Math.max(10, lockIdleTimeout.value) * 1000);
 }
