@@ -49,7 +49,7 @@ app.use((req, res, next) => {
 
 app.use('/api/lock', lockRoutes);
 app.use('/api/menus', publicGetGuard, menuRoutes);
-app.use('/api/cards', publicGetGuard, cardRoutes);
+app.use('/api/cards', unlockGuard, cardRoutes);
 app.use('/api/upload', authMiddleware, uploadRoutes);
 app.use('/api', authRoutes);
 app.use('/api/ads', publicGetGuard, adRoutes);

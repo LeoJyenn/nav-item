@@ -1,20 +1,11 @@
 const express = require('express');
 const db = require('../db');
 const auth = require('./authMiddleware');
-const { hasFullCardAccess } = require('./lockMiddleware');
 const router = express.Router();
 
 function buildFuzzyLikePattern(query) {
   if (!query) return '%';
   return '%' + query.split('').join('%') + '%';
-}
-
-// 匿名请求仅剥离 url 字段（标题/描述/图标路径保留），避免泄露内网面板地址
-function sanitizeCards(rows) {
-  return rows.map(card => {
-    const { url, ...rest } = card;
-    return rest;
-  });
 }
 
 router.get('/search', (req, res) => {
@@ -41,9 +32,7 @@ router.get('/search', (req, res) => {
         card.display_logo = '/uploads/' + card.custom_logo_path;
       }
     });
-    hasFullCardAccess(req, (full) => {
-      res.json(full ? rows : sanitizeCards(rows));
-    });
+    res.json(rows);
   });
 });
 
@@ -68,9 +57,7 @@ router.get('/:menuId', (req, res) => {
         card.display_logo = '/uploads/' + card.custom_logo_path;
       }
     });
-    hasFullCardAccess(req, (full) => {
-      res.json(full ? rows : sanitizeCards(rows));
-    });
+    res.json(rows);
   });
 });
 
