@@ -75,4 +75,31 @@ function publicGetGuard(req, res, next) {
   return unlockGuard(req, res, next);
 }
 
-module.exports = { unlockGuard, publicGetGuard, invalidateLockStateCache };
+// 判断请求是否可获取全量卡片数据：
+// 锁屏未启用 → 全量；已启用时需有效管理员 JWT 或解锁令牌，匿名仅返回脱敏数据
+function hasFullCardAccess(req, callback) {
+  loadLockState((err, state) => {
+    if (err || !state.enabled) return callback(true);
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const payload = jwt.verify(authHeader.slice(7), config.server.jwtSecret);
+        if (payload && payload.id !== undefined && payload.username) return callback(true);
+      } catch (e) {
+        // 不是管理员令牌，继续校验解锁令牌
+      }
+    }
+    const unlockToken = req.headers['x-unlock-token'];
+    if (unlockToken && typeof unlockToken === 'string') {
+      try {
+        const payload = jwt.verify(unlockToken, config.server.jwtSecret);
+        if (payload && payload.type === 'unlock' && payload.ver === state.ver) return callback(true);
+      } catch (e) {
+        // 无效或过期
+      }
+    }
+    callback(false);
+  });
+}
+
+module.exports = { unlockGuard, publicGetGuard, invalidateLockStateCache, hasFullCardAccess };
