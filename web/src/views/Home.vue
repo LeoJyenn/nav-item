@@ -85,7 +85,7 @@
       </a>
     </div>
     
-    <CardGrid :cards="cards" :enableAnimation="shouldAnimateCards" @click.stop /> 
+    <CardGrid :key="gridResetToken" :cards="cards" :enableAnimation="shouldAnimateCards" @click.stop /> 
     
     <LockScreen v-if="isLocked" @unlocked="onUnlocked" />
   </div>
@@ -147,6 +147,7 @@ const isTouchFromHeader = ref(false);
 const needScrollToTop = ref(false);
 
 const isLocked = ref(false);
+const gridResetToken = ref(0);
 const lockIdleTimeout = ref(120);
 let lockIdleTimer = null;
 const lockIdleEvents = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'wheel'];
@@ -575,16 +576,37 @@ function onUnlocked(payload) {
     lockIdleTimeout.value = payload.idleTimeout;
   }
   if (menus.value.length > 0) {
-    // 锁屏期间已加载过菜单：补齐默认选中（保留解锁前的选择），然后只补拉卡片
+    // 锁屏期间已加载过菜单：补齐默认选中（保留解锁前的选择）
     if (!activeMenu.value) {
       activeMenu.value = menus.value[0];
-      needScrollToTop.value = false;
-      shouldAnimateCards.value = true;
     }
-    loadCards();
+    // 解锁恢复：与切换菜单一致，图标以瀑布动画形式重新出现
+    shouldAnimateCards.value = true;
+    // 第一步：先把键盘造成的视口偏移归位，并留出短暂稳定期
+    nextTick(() => {
+      scrollToTop();
+      measureMenuBar();
+    });
+    // 第二步：视口稳定后再恢复卡片；通过重置 key 强制 CardGrid 重建，
+    // 确保入场瀑布动画必然播放（不依赖内部签名比对）
+    setTimeout(() => {
+      gridResetToken.value += 1;
+      needScrollToTop.value = false;
+      loadCards();
+    }, 140);
   } else {
     loadInitialData();
   }
+  // 解锁后图标保持置顶：立即归位一次
+  nextTick(() => {
+    scrollToTop();
+    measureMenuBar();
+  });
+  // 键盘完全收起、iOS 视口恢复存在延迟，之后再校正一次
+  setTimeout(() => {
+    scrollToTop();
+    measureMenuBar();
+  }, 420);
   resetLockIdleTimer();
 }
 
