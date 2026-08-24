@@ -8,7 +8,7 @@ const logger = require('../logger');
 
 const JWT_SECRET = config.server.jwtSecret;
 
-const BCRYPT_ROUNDS = 12;
+const BCRYPT_ROUNDS = 8;
 const loginAttempts = new Map();
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_MAX_ATTEMPTS = 5;
@@ -73,10 +73,10 @@ router.post('/login', (req, res) => {
       if (result) {
         loginAttempts.delete(ip);
         logger.logSecurity('LOGIN_SUCCESS', req, `username=${username}`);
-        // 透明升级：旧轮数哈希在成功验证后用新轮数重写
+        // 透明迁移：存量哈希轮数与目标不一致时（含从更高轮数下调），成功验证后用新轮数重写
         const roundsMatch = /\$2[aby]\$(\d+)\$/.exec(user.password);
         const currentRounds = roundsMatch ? parseInt(roundsMatch[1], 10) : BCRYPT_ROUNDS;
-        if (currentRounds < BCRYPT_ROUNDS) {
+        if (currentRounds !== BCRYPT_ROUNDS) {
           bcrypt.hash(password, BCRYPT_ROUNDS, (hashErr, newHash) => {
             if (!hashErr) {
               db.run('UPDATE users SET password = ? WHERE id = ?', [newHash, user.id]);

@@ -10,6 +10,9 @@ const logger = require('../logger');
 
 const JWT_SECRET = config.server.jwtSecret;
 const UNLOCK_TOKEN_EXPIRES = '12h';
+// bcryptjs 为纯 JS 实现，弱 CPU（ARMv7）上 cost 12 单次验证约 4.3 秒；
+// 在线爆破已有速率限制，主页锁屏场景下 cost 8（实测约 270ms）足够安全
+const LOCK_BCRYPT_COST = 8;
 
 function getSetting(key) {
   return new Promise((resolve, reject) => {
@@ -106,6 +109,15 @@ router.post('/verify', async (req, res) => {
     verifyAttempts.delete(ip);
     logger.logSecurity('LOCK_UNLOCK_SUCCESS', req);
 
+    // 成本透明迁移：存量哈希 cost 与目标不一致时，用当前密码重哈希保存（下次解锁起提速）
+    try {
+      const costMatch = /^\$2[aby]\$(\d{2})\$/.exec(cfg.lock_password_hash || '');
+      if (costMatch && parseInt(costMatch[1], 10) !== LOCK_BCRYPT_COST) {
+        const upgradedHash = await bcrypt.hash(password, LOCK_BCRYPT_COST);
+        await setSetting('lock_password_hash', upgradedHash);
+      }
+    } catch (e) { /* 迁移失败不影响本次解锁 */ }
+
     const ver = parseInt(cfg.lock_token_version, 10) || 1;
     const token = jwt.sign({ type: 'unlock', ver }, JWT_SECRET, { expiresIn: UNLOCK_TOKEN_EXPIRES });
     res.json({ success: true, locked: true, token, idleTimeout: parseInt(cfg.lock_idle_timeout, 10) || 300 });
@@ -162,7 +174,7 @@ router.post('/config', auth, async (req, res) => {
           return res.status(401).json({ success: false, error: '当前密码错误' });
         }
       }
-      const hash = await bcrypt.hash(newPassword, 12);
+      const hash = await bcrypt.hash(newPassword, LOCK_BCRYPT_COST);
       await setSetting('lock_password_hash', hash);
       passwordChanged = true;
     }
