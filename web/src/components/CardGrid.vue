@@ -196,15 +196,9 @@ function getCardStyle(index) {
     };
   }
 
-  const animationLimit = 16;
-  if (index >= animationLimit) {
-    return {
-      opacity: 1,
-      animation: 'none'
-    };
-  }
-
-  const delay = Math.min(index, 20) * 30;
+  // 行级瀑布：按行递增延迟，所有卡片自上而下依次浮现，总时长封顶约 600ms
+  const row = Math.floor(index / Math.max(1, columns.value));
+  const delay = Math.min(row * 60, 600);
   if (delay <= 0) return { opacity: 1 };
 
   return {
