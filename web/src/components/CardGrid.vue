@@ -238,6 +238,17 @@ function faviconChain(card) {
 function onImgLoad(e) {
   e.target.dataset.chainIdx = '';
   e.target.style.display = '';
+  applyIconTileClass(e.target);
+}
+
+// 自定义上传（/uploads/）且近方形（宽高比 0.8~1.25）的图按满版处理：去白底座，由图标自身填满圆角砖；
+// 其余来源保持白底座。放在 load 回调里，错误链降级换源后类名会自动纠正
+function applyIconTileClass(img) {
+  const src = img.currentSrc || img.src || '';
+  const isLocal = src.indexOf('/uploads/') !== -1;
+  const ratio = img.naturalWidth / Math.max(1, img.naturalHeight);
+  const nearSquare = ratio >= 0.8 && ratio <= 1.25;
+  img.classList.toggle('icon-fullbleed', isLocal && nearSquare);
 }
 
 function onImgError(e, card) {
@@ -448,6 +459,12 @@ function truncate(str) {
   background: #ffffff;
   border-radius: 8px;
   transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.3s ease;
+}
+
+/* 自定义上传的近方形满版图：去白底座，由图标自身填满圆角砖（cover 裁切），避免白边突兀 */
+.link-icon.icon-fullbleed {
+  background: transparent;
+  object-fit: cover;
 }
 
 @media (max-width: 480px) {
